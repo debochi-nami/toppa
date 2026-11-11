@@ -43,6 +43,8 @@ th{font-size:11px;font-weight:700;color:var(--muted);text-align:right;padding:2p
 td{padding:7px 4px;border-top:1px solid var(--line);text-align:right;font-family:var(--num);font-size:17px;white-space:nowrap}
 th:nth-child(2),td:nth-child(2){text-align:left}
 td.t{font-family:var(--jp);font-size:14px;font-weight:700}
+td .sub span{white-space:nowrap;margin-right:6px}
+td .sub{font-family:var(--jp);font-size:12px;white-space:normal;font-weight:400;color:var(--muted);margin-top:1px}
 tr.me td{background:var(--ao-soft)}
 td .pill{margin-left:4px}
 .vp{font-weight:700;font-size:21px}
@@ -276,6 +278,9 @@ function h2hOf(ms,a,b,n,rule){
 }
 function rivalNow(me,r,ms,n,rule){
   const h=h2hOf(ms,me.i,r.i,n,rule);
+  return rivalBase(me,r,h)+`／一本 ${me.if}対${r.if}`;
+}
+function rivalBase(me,r,h){
   if(h>0)return"直接対決に勝っているので上";
   if(h<0)return"直接対決に負けているので下";
   const k=r.bw-me.bw;
@@ -284,7 +289,14 @@ function rivalNow(me,r,ms,n,rule){
   const p=r.pf-me.pf;
   if(p<0)return`勝数は同じ。総得点で${-p}点リード`;
   if(p>0)return`勝数は同じ。総得点であと${p+1}点で逆転（${p}点で並ぶと総失点の勝負）`;
-  return"勝数も総得点も同じ。総失点以降の勝負";
+  return "勝数も総得点も同じ。"+afterPoints(me,r);
+}
+/* 総得点まで同じときの、その先の比べ方（総失点 → 一本 → 被一本 → 技あり → 被技あり） */
+function afterPoints(me,r){
+  const L=[["pa",-1,"総失点"],["if",1,"一本"],["ia",-1,"被一本"],["zf",1,"技あり"],["za",-1,"被技あり"]];
+  for(const[k,dir,lab]of L){const d=(me[k]-r[k])*dir;
+    if(d)return`${lab}で${d>0?"上":"下"}（${me[k]}対${r[k]}）`}
+  return"被技ありまで同じ。代表戦";
 }
 /* 残り1試合のときの条件。bw・得点はこの試合全体で必要な数（入力中の分を含む） */
 function needInMatch(me,r,n){
@@ -315,7 +327,7 @@ function finalScenarios(tm,ms,f,n,rule){
         if(r.i===opp){
           if(idx===0)t="直接対決に勝つので上";
           else if(idx===2)t="直接対決に負けるので下";
-          else{const k=r.bw-me.bw,p=r.pf-me.pf;t=k<0?"個人戦の勝数で上":k>0?"個人戦の勝数で下":p<0?"総得点で上":p>0?"総得点で下":"総失点以降の勝負"}
+          else{const k=r.bw-me.bw,p=r.pf-me.pf;t=k<0?"個人戦の勝数で上":k>0?"個人戦の勝数で下":p<0?"総得点で上":p>0?"総得点で下":"総得点も同じ。"+afterPoints(me,r)}
         }else{const h=h2hOf(ms,f,r.i,n,rule);t=h>0?"直接対決に勝っているので上":h<0?"直接対決に負けているので下":needInMatch(me,r,n)}
         return r.name+"："+t});
     }
@@ -572,7 +584,7 @@ function boot(){
     // 順位表
     const st=standings(tm,ms,n,S.rule);
     $("table").innerHTML=`<table><thead><tr><th>順</th><th style="text-align:left">チーム</th><th>点</th><th>勝分負</th><th>個人勝</th><th>得失</th></tr></thead><tbody>`+
-      st.map(s=>{const x=analyse(tm,ms,s.i,n,S.rule);return `<tr class="${s.i===f?"me":""}"><td>${s.rank}</td><td class="t">${s.name}${pill(x.state)}</td><td class="vp">${s.vp}</td><td>${s.w}-${s.d}-${s.l}</td><td>${s.bw}</td><td>${s.pf}-${s.pa}</td></tr>`}).join("")+`</tbody></table>`;
+      st.map(s=>{const x=analyse(tm,ms,s.i,n,S.rule);return `<tr class="${s.i===f?"me":""}"><td>${s.rank}</td><td class="t">${s.name}${pill(x.state)}<div class="sub"><span>一本 ${s.if}-${s.ia}</span> <span>技あり ${s.zf}-${s.za}</span></div></td><td class="vp">${s.vp}</td><td>${s.w}-${s.d}-${s.l}</td><td>${s.bw}</td><td>${s.pf}-${s.pa}</td></tr>`}).join("")+`</tbody></table><p class="note">得失・一本・技あり は 取った数-取られた数。</p>`;
     const whys=st.filter(s=>s.why).map(s=>`${s.rank}位 ${s.name}：${s.undecided?"代表戦待ち":s.why+"で下"}`);
     const qk=st.some(s=>s.quick);
     const und=st.some(s=>s.undecided);
@@ -609,7 +621,7 @@ function boot(){
   function tieLines(tm,ms,f,n,m){
     const st=standings(tm,ms,n,S.rule),by={};st.forEach(x=>by[x.i]=x);
     const opp=m.x===f?m.y:m.x,mine=m.x===f?"a":"b",ls=matchStat(m,n);
-    const myVp=by[f].vp+3,myBw=by[f].bw+(mine==="a"?ls.wa:ls.wb),myPf=by[f].pf+(mine==="a"?ls.pa:ls.pb),left=n-ls.played;
+    const myVp=by[f].vp+3,myBw=by[f].bw+(mine==="a"?ls.wa:ls.wb),myPf=by[f].pf+(mine==="a"?ls.pa:ls.pb),left=n-ls.played,myIf=by[f].if+(mine==="a"?ls.ia:ls.ib);
     const open=ms.filter(x=>!x.done&&x!==m&&x.id!==m.id);
     const out=[],cand=[];
     st.forEach(r=>{
@@ -619,7 +631,7 @@ function boot(){
       cand.push({r,rest,h:h2hOf(ms,f,r.i,n,S.rule)});
     });
     const need=(r)=>{
-      const k=r.bw-myBw,p=r.pf-myPf,pt=p<0?"総得点で上":`総得点あと${p+1}点で上`;
+      const k=r.bw-myBw,p=r.pf-myPf,pt=(p<0?"総得点で上":`総得点あと${p+1}点で上`)+`（一本 ${myIf}対${r.if}）`;
       if(k<0)return`勝数で上（いま${-k}勝多い）`;
       if(k+1<=left)return`残りであと${k+1}勝すれば上。${k?`${k}勝なら`:"勝数が並べば"}${pt}`;
       if(k<=left)return`勝数は並ぶのが最大。${pt}`;
@@ -689,7 +701,7 @@ function boot(){
     const W=me==="a"?s.wa:s.wb,L=me==="a"?s.wb:s.wa,d=me==="a"?s.pa-s.pb:s.pb-s.pa,D=s.played-W-L;
     const sd=d>0?`+${d}`:`${d}`;
     return `<div class="now" aria-live="polite"><div class="sb">${A} ${s.wa} - ${s.wb} ${B}</div>
-      <div>${T}：${W}勝${L}敗${D?D+"分":""}・得点 ${me==="a"?s.pa:s.pb}-${me==="a"?s.pb:s.pa}（${d===0?"同点":sd+"点"}）</div>
+      <div>${T}：${W}勝${L}敗${D?D+"分":""}・得点 ${me==="a"?s.pa:s.pb}-${me==="a"?s.pb:s.pa}（${d===0?"同点":sd+"点"}）・一本 ${me==="a"?s.ia:s.ib}-${me==="a"?s.ib:s.ia}・技あり ${me==="a"?s.za:s.zb}-${me==="a"?s.zb:s.za}</div>
       <div class="lv">${live}</div></div>`;
   }
   function matchHtml(m,i,tm,n){
