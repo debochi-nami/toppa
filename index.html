@@ -125,6 +125,10 @@ button:disabled{opacity:.5;cursor:default}
     <div id="tnBox" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
     <div class="actions"><button id="tnSave" class="small">チーム名を保存</button><button id="tnReset" class="small">大会の組分けに戻す</button></div>
     <p class="note">1〜5番の位置で試合の組み合わせと赤青が決まります。入力済みの結果はそのまま残ります。</p>
+    <label><b>この組の試合順と赤青</b></label>
+    <div id="ordBox" style="display:flex;flex-direction:column;gap:4px"></div>
+    <div class="actions"><button id="ordReset" class="small">推定の試合順に戻す</button></div>
+    <p class="note" id="ordNote">↑↓で順番、⇄で赤青を入れ替えます。押すとすぐ保存されます。入力済みの結果はそのまま残ります（赤青を入れ替えると得点も一緒に入れ替わります）。</p>
     <label for="backup"><b>データの控え</b></label>
     <textarea id="backup" rows="3" aria-label="データの控え"></textarea>
     <div class="actions"><button id="bkCopy" class="small">今のデータを出してコピー</button><button id="bkLoad" class="small">貼り付けたデータを読み込む</button></div>
@@ -448,7 +452,7 @@ function boot(){
       show(col,base+"／ネットなしでも動きます"+(sa?"":"（共有ボタン→「ホーム画面に追加」で使ってください）"));
     }).catch(()=>show("#b26a00",base+"／ネットなしの準備に失敗。電波のある所で開き直してください"));})();
   const LS="wc-hangzhou-v1";
-  let S={ms:{},rule:"points",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{}};
+  let S={ms:{},rule:"points",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{}};
   try{const v=JSON.parse(localStorage.getItem(LS)||"null");if(v)S=Object.assign(S,v)}catch(e){}
   let db=null,pending={},timers={};
   const $=id=>document.getElementById(id);
@@ -468,13 +472,21 @@ function boot(){
   // チーム名：変更があればそれを使う
   const cleanNames=v=>{const o={};if(v&&typeof v==="object")Object.keys(v).forEach(k=>{if(/^[MF]_[A-D]$/.test(k)&&Array.isArray(v[k])&&v[k].length===5)o[k]=v[k].map(x=>String(x||"").trim().slice(0,20))});return o};
   S.names=cleanNames(S.names);
+  const cleanOrders=v=>{const o={};if(v&&typeof v==="object")Object.keys(v).forEach(k=>{const a=v[k];
+    if(!/^[MF]_[A-D]$/.test(k)||!Array.isArray(a)||a.length!==10)return;
+    const seen=new Set();for(const p of a){if(!Array.isArray(p)||p.length!==2)return;const[x,y]=p.map(Number);
+      if(!(x>=0&&x<5&&y>=0&&y<5&&x!==y&&Number.isInteger(x)&&Number.isInteger(y)))return;seen.add(Math.min(x,y)*5+Math.max(x,y))}
+    if(seen.size===10)o[k]=a.map(p=>[+p[0],+p[1]])});return o};
+  S.orders=cleanOrders(S.orders);
+  const getOrd=k=>S.orders[k]||ORDER[k];
+  const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
   const teamsOf=(cat,g)=>{const o=S.names[cat+"_"+g],d=CATS[cat].groups[g];return o?o.map((x,i)=>x||d[i]):d};
   const teams=()=>teamsOf(S.cat,S.grp);
   const mid=i=>S.cat+"_"+S.grp+"_"+i;
   const PR=pairings(5);
   const pairIdx=(x,y)=>PR.findIndex(([a,b])=>(a===x&&b===y)||(a===y&&b===x));
-  const hasOrder=()=>!!ORDER[S.cat+"_"+S.grp];
-  const matches=()=>{const o=ORDER[S.cat+"_"+S.grp];
+  const hasOrder=()=>!!getOrd(S.cat+"_"+S.grp);
+  const matches=()=>{const o=getOrd(S.cat+"_"+S.grp);
     const ids=o?o.map(([r,b])=>pairIdx(r,b)):PR.map((_,i)=>i);
     return ids.map(i=>findMatch(mid(i)))};
   const sw=v=>v==="a"?"b":v==="b"?"a":v;
@@ -486,7 +498,7 @@ function boot(){
   function findMatch(id){
     const p=id.split("_");
     if(p[1]==="K")return Object.assign({bouts:[],rep:null},S.ms[id]||{},{id});
-    const[x,y]=PR[+p[2]],o=ORDER[p[0]+"_"+p[1]];
+    const[x,y]=PR[+p[2]],o=getOrd(p[0]+"_"+p[1]);
     const flip=!!o&&o.some(([r,b])=>r===y&&b===x);
     const raw=S.ms[id]||{},data=flip?swapM(raw):raw;
     return Object.assign({bouts:[],done:false,q:null},data,flip?{x:y,y:x,id,flip:true}:{x,y,id});
@@ -574,6 +586,10 @@ function boot(){
     $("matches").innerHTML=ms.map((m,i)=>matchHtml(m,i,tm,n)).join("");
     $("tieRule").value=S.rule;
     $("tnBox").innerHTML=tm.map((t,i)=>`<input id="tn${i}" aria-label="${i+1}番のチーム" value="${t.replace(/"/g,"&quot;")}" maxlength="20" style="font:inherit;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:inherit">`).join("");
+    {const k=S.cat+"_"+S.grp,cur=getOrd(k)||PR,b="min-height:34px;padding:2px 8px";
+     $("ordBox").innerHTML=cur.map(([r,bl],i)=>`<div style="display:flex;align-items:center;gap:4px"><span style="flex:1;min-width:0">${i+1}. <b style="color:#c62828">赤</b> ${esc(tm[r])} − <b style="color:#1565c0">青</b> ${esc(tm[bl])}</span><button class="small" style="${b}" data-ou="${i}" aria-label="${i+1}試合目を上へ" ${i?"":"disabled"}>↑</button><button class="small" style="${b}" data-od="${i}" aria-label="${i+1}試合目を下へ" ${i<cur.length-1?"":"disabled"}>↓</button><button class="small" style="${b}" data-os="${i}" aria-label="${i+1}試合目の赤青を入れ替え">⇄</button></div>`).join("");
+     $("ordReset").textContent=ORDER[k]?"推定の試合順に戻す":"元の並びに戻す";
+     $("ordReset").disabled=!S.orders[k];}
     renderChips();
   }
   // 突破に必要な結果（この試合が計算対象チームの残り試合のとき）
@@ -744,13 +760,21 @@ function boot(){
     if(v.every((x,i)=>x===d[i]))delete S.names[k];else S.names[k]=v;
     saveLocal();render();pushNames();$("setmsg").textContent="チーム名を保存しました。"});
   $("tnReset").addEventListener("click",()=>{delete S.names[S.cat+"_"+S.grp];saveLocal();render();pushNames();$("setmsg").textContent="大会の組分けに戻しました。"});
+  $("ordBox").addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+    const k=S.cat+"_"+S.grp,a=(getOrd(k)||PR).map(p=>p.slice());let i,msg;
+    if(t.dataset.ou!=null){i=+t.dataset.ou;if(i<1)return;[a[i-1],a[i]]=[a[i],a[i-1]];msg=`${i}試合目と${i+1}試合目を入れ替えました。`}
+    else if(t.dataset.od!=null){i=+t.dataset.od;if(i>=a.length-1)return;[a[i+1],a[i]]=[a[i],a[i+1]];msg=`${i+1}試合目と${i+2}試合目を入れ替えました。`}
+    else if(t.dataset.os!=null){i=+t.dataset.os;a[i].reverse();msg=`${i+1}試合目の赤青を入れ替えました。`}
+    else return;
+    S.orders[k]=a;S.open=null;saveLocal();render();$("setmsg").textContent=msg});
+  $("ordReset").addEventListener("click",()=>{delete S.orders[S.cat+"_"+S.grp];S.open=null;saveLocal();render();$("setmsg").textContent="試合順を元に戻しました。"});
   $("tieRule").addEventListener("change",async e=>{S.rule=e.target.value;saveLocal();render();
     if(db){try{await db.doc("settings/main").set({rule:S.rule})}catch(x){}}});
-  $("bkCopy").addEventListener("click",async()=>{const t=JSON.stringify({ms:S.ms,rule:S.rule,names:S.names});$("backup").value=t;
+  $("bkCopy").addEventListener("click",async()=>{const t=JSON.stringify({ms:S.ms,rule:S.rule,names:S.names,orders:S.orders});$("backup").value=t;
     try{await navigator.clipboard.writeText(t);$("setmsg").textContent="コピーしました。"}catch(e){$("backup").select();$("setmsg").textContent="欄の文字を選択しました。手でコピーしてください。"}});
   $("bkLoad").addEventListener("click",()=>{try{const v=JSON.parse($("backup").value);if(!v||typeof v.ms!=="object")throw 0;
       const clean={};Object.keys(v.ms).forEach(k=>{if(IDRE.test(k))clean[k]=sanitize(v.ms[k])});
-      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
+      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders)S.orders=cleanOrders(v.orders);Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
     catch(e){$("setmsg").textContent="読み込めません。コピーした文字をそのまま貼り付けてください。"}});
   let armed=false;
   $("resetBtn").addEventListener("click",()=>{
