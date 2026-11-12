@@ -119,10 +119,10 @@ button:disabled{opacity:.5;cursor:default}
   <details class="panel"><summary>設定と控え</summary><div>
     <label for="tieRule"><b>同じ勝数のときの試合結果</b></label>
     <select id="tieRule">
+      <option value="bouts">勝数が同じなら引分（大会側に確認済み）</option>
       <option value="points">総得点の多いほうの勝ち。得点も同じなら引分</option>
-      <option value="bouts">勝数が同じなら引分</option>
     </select>
-    <p class="note">大会資料にグループ戦の引分の定義がありません。WKF規則12.5（トーナメント戦）に合わせて上を初期値にしています。監督会議で確認してください。</p>
+    <p class="note">グループ戦では団体として勝負を決めない（勝数が同じなら引分）と確認済み（11/12）。総得点は順位を決めるときに使います。</p>
     <label><b>この組のチーム名（対戦相手の変更）</b></label>
     <div id="tnBox" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
     <div class="actions"><button id="tnSave" class="small">チーム名を保存</button><button id="tnReset" class="small">大会の組分けに戻す</button></div>
@@ -490,8 +490,9 @@ function boot(){
       show(col,base+"／ネットなしでも動きます"+(sa?"":"（共有ボタン→「ホーム画面に追加」で使ってください）"));
     }).catch(()=>show("#b26a00",base+"／ネットなしの準備に失敗。電波のある所で開き直してください"));})();
   const LS="wc-hangzhou-practice-v1";
-  let S={ms:{},rule:"points",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{},koNames:{}};
+  let S={ms:{},rule:"bouts",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{},koNames:{}};
   try{const v=JSON.parse(localStorage.getItem(LS)||"null");if(v)S=Object.assign(S,v)}catch(e){}
+  if(!S.ruleFix1112){S.rule="bouts";S.ruleFix1112=1}
   let db=null,pending={},timers={};
   const $=id=>document.getElementById(id);
   const saveLocal=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
