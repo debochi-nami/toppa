@@ -177,8 +177,12 @@ function boutWinner(bt){
   if(bt.dq)return bt.dq==="a"?"b":"a";
   const x=pts(bt.a),y=pts(bt.b);
   if(bt.o==="a"||bt.o==="b")return bt.o;   // 先取・判定の手動指定
-  if(x>y)return"a"; if(y>x)return"b"; return"d";
+  if(x>y)return"a"; if(y>x)return"b";
+  return ipw(bt)||"d";   // 同点・先取なし → 一本の多いほう → 技ありの多いほう → 引分（WKF 組手競技規定 12.2.3〜12.2.5）
 }
+function ipw(bt){const a=bt.a||{},b=bt.b||{};
+  if((a.i|0)!==(b.i|0))return(a.i|0)>(b.i|0)?"a":"b";
+  if((a.w|0)!==(b.w|0))return(a.w|0)>(b.w|0)?"a":"b";return null}
 function boutStat(bt){ // 失格は相手に8点（有効扱い）、本人は0
   const side=k=>bt.dq===k?emptySide():bt.dq?{y:8,w:0,i:0}:bt[k];
   return {a:side("a"),b:side("b")};
@@ -416,7 +420,8 @@ function liveNeed(m,n,me,rule,ko){
     const s0=matchStat(m,n-1),w0=me==="a"?s0.wa:s0.wb,l0=me==="a"?s0.wb:s0.wa,d0=(me==="a"?s0.pa-s0.pb:s0.pb-s0.pa);
     if(w0>=maj)return{done:ko?"勝ち":"勝ちが確定"};if(l0>=maj)return{done:ko?"負け":"負けが確定"};
     const px=last&&last.t?pts(last[me]):0,py=last&&last.t?pts(last[op]):0;
-    const res=(x,y,sen)=>{const bt=x>y?1:x<y?-1:sen===me?1:sen===op?-1:0;
+    const iw=last&&last.t?ipw(last):null,tb=iw===me?1:iw===op?-1:0;
+    const res=(x,y,sen)=>{const bt=x>y?1:x<y?-1:sen===me?1:sen===op?-1:tb;
       const bw=w0+(bt>0),bl=l0+(bt<0);if(bw>bl)return 2;if(bw<bl)return 0;
       if(!ko&&rule==="bouts")return 1;const t=d0+x-y;return t>0?2:t<0?0:1};
     const sen=last&&last.o||null;
@@ -742,7 +747,7 @@ function boot(){
     return `<div class="bout" data-bk="${i}:${k}"><button class="bh" data-cur="${i}:${k}"><span>${nm}</span><span>${res}</span></button>
       <div class="sides">${side("a",A)}${side("b",B)}</div>
       <div class="tie">
-        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">引分で終了</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:""}
+        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">${ipw(bt)?`このまま終了（${ipw(bt)==="a"?A:B} の勝ち：${(bt.a.i|0)!==(bt.b.i|0)?"一本":"技あり"}が多い）`:"引分で終了"}</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:""}
         <button data-undo="${i}:${k}">1つ戻す</button>
         <button data-dq="${i}:${k}:a" aria-pressed="${bt.dq==="a"}">${A} 失格・棄権</button><button data-dq="${i}:${k}:b" aria-pressed="${bt.dq==="b"}">${B} 失格・棄権</button>
       </div></div>`;
