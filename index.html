@@ -464,7 +464,7 @@ function boot(){
       show(col,base+"／ネットなしでも動きます"+(sa?"":"（共有ボタン→「ホーム画面に追加」で使ってください）"));
     }).catch(()=>show("#b26a00",base+"／ネットなしの準備に失敗。電波のある所で開き直してください"));})();
   const LS="wc-hangzhou-v1";
-  let S={ms:{},rule:"points",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{}};
+  let S={ms:{},rule:"points",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{},koNames:{}};
   try{const v=JSON.parse(localStorage.getItem(LS)||"null");if(v)S=Object.assign(S,v)}catch(e){}
   let db=null,pending={},timers={};
   const $=id=>document.getElementById(id);
@@ -490,6 +490,10 @@ function boot(){
       if(!(x>=0&&x<5&&y>=0&&y<5&&x!==y&&Number.isInteger(x)&&Number.isInteger(y)))return;seen.add(Math.min(x,y)*5+Math.max(x,y))}
     if(seen.size===10)o[k]=a.map(p=>[+p[0],+p[1]])});return o};
   S.orders=cleanOrders(S.orders);
+  const cleanKo=v=>{const o={};if(v&&typeof v==="object")Object.keys(v).forEach(k=>{const x=v[k];if(!/^[MF]_(QF[1-4]|SF[12]|BR|FN)$/.test(k)||!x||typeof x!=="object")return;
+    const r={};["a","b"].forEach(s=>{const t=String(x[s]||"").trim().slice(0,20);if(t)r[s]=t});if(r.a||r.b)o[k]=r});return o};
+  S.koNames=cleanKo(S.koNames);
+  const allTeams=cat=>Object.keys(CATS[cat].groups).flatMap(g=>teamsOf(cat,g));
   const getOrd=k=>S.orders[k]||ORDER[k];
   const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
   const teamsOf=(cat,g)=>{const o=S.names[cat+"_"+g],d=CATS[cat].groups[g];return o?o.map((x,i)=>x||d[i]):d};
@@ -532,15 +536,16 @@ function boot(){
         const t=(r.win==="a")!==lose?r.A:r.B;
         return t.name?{name:t.name,lab:l,tent:t.tent}:{name:null,lab:l};
       };
-      const m=findMatch(cat+"_K_"+id),w=koWinner(m,n);
-      res[id]={id,lab,m,A:side(A),B:side(B),win:w==="a"||w==="b"?w:null,tie:w==="tie"};
+      const m=findMatch(cat+"_K_"+id),w=koWinner(m,n),man=S.koNames[cat+"_"+id]||{};
+      const pick=(s,src)=>{const a=side(src);return man[s]?{name:man[s],lab:a.lab,man:true}:a};
+      res[id]={id,lab,m,A:pick("a",A),B:pick("b",B),win:w==="a"||w==="b"?w:null,tie:w==="tie"};
     });
     return res;
   }
   const tName=t=>t.name||t.lab;
   function koHtml(r,n){
     const m=r.m,s=matchStat(m,n),A=tName(r.A),B=tName(r.B);
-    const nm=t=>t.name?t.name+(t.tent?'<small class="tent">暫定</small>':""):`<span class="tbd">${t.lab}</span>`;
+    const nm=t=>t.name?esc(t.name)+(t.man?'<small class="tent">手入力</small>':t.tent?'<small class="tent">暫定</small>':""):`<span class="tbd">${t.lab}</span>`;
     const lab=r.win?(r.win==="a"?A:B)+" 勝ち":r.tie?"代表戦で決める":s.played?"入力中":"未入力";
     const head=`<button class="mh ${r.win?"done":""}" data-open="${m.id}" aria-expanded="${S.open===m.id}"><span class="a">${nm(r.A)}</span><span class="s">${s.wa} - ${s.wb}<small>${s.pa} - ${s.pb}点・${lab}</small></span><span class="b">${nm(r.B)}</span></button>`;
     if(S.open!==m.id)return head;
@@ -549,13 +554,17 @@ function boot(){
     const ck=(r.win||r.tie)?-1:curBout(m,n),box=nowHtml(m,n,A,B,live,false);
     const bouts=cfg().names.map((x,k)=>(k===ck?box:"")+boutHtml(m.id,k,x,(m.bouts||[])[k]||emptyBout(),A,B,k===ck)).join("");
     const rep=(r.tie||m.rep)?`<div class="tie"><button data-rep="${m.id}:a" aria-pressed="${m.rep==="a"}">${A} 代表戦の勝ち</button><button data-rep="${m.id}:b" aria-pressed="${m.rep==="b"}">${B} 代表戦の勝ち</button></div>`:"";
-    return head+`<div class="editor">${ck<0?`<div class="live">${live}</div>`:""}${bouts}${rep}${resetHtml(m.id)}</div>`;
+    const kk=S.cat+"_"+r.id,mv=S.koNames[kk]||{},list=allTeams(S.cat);
+    const selT=(s,t)=>{const cur=mv[s]||"";const opts=list.includes(cur)||!cur?list:[cur,...list];
+      return `<label style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0"><span class="note">${s==="a"?"左（赤）":"右（青）"}</span><select data-kon="${kk}:${s}"><option value="">自動（${esc(t.lab)}）</option>${opts.map(x=>`<option value="${esc(x)}"${x===cur?" selected":""}>${esc(x)}</option>`).join("")}</select></label>`};
+    const manual=`<details${mv.a||mv.b?" open":""}><summary class="note">チームを手で入れる（自動と違うとき）</summary><div style="display:flex;gap:6px;margin-top:6px">${selT("a",r.A)}${selT("b",r.B)}</div><p class="note">「自動」に戻すと、グループの順位・前の試合の結果から入ります。手で入れたチームは次の試合にもそのまま進みます。</p></details>`;
+    return head+`<div class="editor">${manual}${ck<0?`<div class="live">${live}</div>`:""}${bouts}${rep}${resetHtml(m.id)}</div>`;
   }
   function renderKO(){
     const n=cfg().bouts,R=koTeams(S.cat);
     const sec=(t,ids)=>`<h2>${t}</h2>`+ids.map(id=>koHtml(R[id],n)).join("");
     $("ko").innerHTML=sec("準々決勝",["QF1","QF2","QF3","QF4"])+sec("準決勝",["SF1","SF2"])+sec("3位決定戦・決勝",["BR","FN"])+
-      `<p class="note">チームはグループの順位から自動で入ります（組の試合が全部終わるまでは「暫定」）。どちらかが過半数（${Math.floor(n/2)+1}勝）を取った時点で勝ち。全部戦って勝数が同じなら総得点、それも同じなら代表戦。組み合わせは WKF Qualification and Competition System 5.2 の図より。</p>`;
+      `<p class="note">チームはグループの順位から自動で入ります（組の試合が全部終わるまでは「暫定」）。公式の組み合わせと違うときは、試合を開いて「チームを手で入れる」から選べます。どちらかが過半数（${Math.floor(n/2)+1}勝）を取った時点で勝ち。全部戦って勝数が同じなら総得点、それも同じなら代表戦。組み合わせは WKF Qualification and Competition System 5.2 の図より。</p>`;
   }
 
   function pill(st){return st==="in"?'<span class="pill p-ok">確定</span>':st==="out"?'<span class="pill p-out">敗退</span>':""}
@@ -780,13 +789,17 @@ function boot(){
     else return;
     S.orders[k]=a;S.open=null;saveLocal();render();$("setmsg").textContent=msg});
   $("ordReset").addEventListener("click",()=>{delete S.orders[S.cat+"_"+S.grp];S.open=null;saveLocal();render();$("setmsg").textContent="試合順を元に戻しました。"});
+  $("ko").addEventListener("change",e=>{const t=e.target.closest("select[data-kon]");if(!t)return;
+    const[k,s]=t.dataset.kon.split(":"),o=Object.assign({},S.koNames[k]||{});
+    if(t.value)o[s]=t.value;else delete o[s];
+    if(o.a||o.b)S.koNames[k]=o;else delete S.koNames[k];saveLocal();render()});
   $("tieRule").addEventListener("change",async e=>{S.rule=e.target.value;saveLocal();render();
     if(db){try{await db.doc("settings/main").set({rule:S.rule})}catch(x){}}});
-  $("bkCopy").addEventListener("click",async()=>{const t=JSON.stringify({ms:S.ms,rule:S.rule,names:S.names,orders:S.orders});$("backup").value=t;
+  $("bkCopy").addEventListener("click",async()=>{const t=JSON.stringify({ms:S.ms,rule:S.rule,names:S.names,orders:S.orders,koNames:S.koNames});$("backup").value=t;
     try{await navigator.clipboard.writeText(t);$("setmsg").textContent="コピーしました。"}catch(e){$("backup").select();$("setmsg").textContent="欄の文字を選択しました。手でコピーしてください。"}});
   $("bkLoad").addEventListener("click",()=>{try{const v=JSON.parse($("backup").value);if(!v||typeof v.ms!=="object")throw 0;
       const clean={};Object.keys(v.ms).forEach(k=>{if(IDRE.test(k))clean[k]=sanitize(v.ms[k])});
-      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders)S.orders=cleanOrders(v.orders);Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
+      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders)S.orders=cleanOrders(v.orders);if(v.koNames)S.koNames=cleanKo(v.koNames);Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
     catch(e){$("setmsg").textContent="読み込めません。コピーした文字をそのまま貼り付けてください。"}});
   let armed=false;
   $("resetBtn").addEventListener("click",()=>{
