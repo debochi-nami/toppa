@@ -84,6 +84,7 @@ td .pill{margin-left:4px}
 .now{border:2px solid var(--fg);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:13px}
 .now .sb{font-size:17px;font-weight:800}
 .now .lv{font-weight:700}
+input.pn{font:inherit;font-size:16px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:inherit;width:100%;min-width:0;box-sizing:border-box}
 button.bh{border:0;background:none;min-height:32px;padding:0;width:100%;text-align:left}
 .bh .hint{font-weight:400;color:var(--muted);font-size:11px}
 details summary{cursor:pointer;font-size:13px;color:var(--muted);min-height:32px}
@@ -112,6 +113,7 @@ button:disabled{opacity:.5;cursor:default}
     <div class="seg" id="cats"></div>
     <div class="seg" id="groups"></div>
   </div>
+  <datalist id="pnList"></datalist>
   <section class="panel" id="judge"></section>
   <section class="panel" id="stand"><h2>順位（上位2チームが準々決勝へ）</h2><div class="tw" id="table"></div><p class="note" id="tbnote"></p><div id="tbrep"></div></section>
   <section id="gm" style="display:flex;flex-direction:column;gap:8px"><h2>試合（タップして入力）</h2><div id="matches" style="display:flex;flex-direction:column;gap:8px"></div></section>
@@ -134,6 +136,9 @@ button:disabled{opacity:.5;cursor:default}
     <label for="backup"><b>データの控え</b></label>
     <textarea id="backup" rows="3" aria-label="データの控え"></textarea>
     <div class="actions"><button id="bkCopy" class="small">今のデータを出してコピー</button><button id="bkLoad" class="small">貼り付けたデータを読み込む</button></div>
+    <label><b>分析用のデータ（CSV）</b></label>
+    <div class="actions"><button id="csvOut" class="small">分析用にCSVで出す</button></div>
+    <p class="note">男女・全グループ・決勝トーナメントの入力をまとめて出します。1行＝1つの得点（得点のない本は1行）。時刻はこの携帯の時計で、得点ボタンを押した時刻です（この更新より前に入れた点は空欄）。Excel で開けます。</p>
     <button id="resetBtn" class="small">このグループの結果を消す</button>
     <p class="note" id="setmsg"></p>
     <p class="note">勝ち3・引分1・負け0。準々決勝へは各組上位2チーム。同点の順は 直接対決 → 勝った試合数（個人戦）→ 総得点 → 総失点 → 一本 → 被一本 → 技あり → 被技あり → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは、上のチームが抜けるたびに残りを直接対決から比べ直します。</p>
@@ -222,6 +227,7 @@ function standings(teams,ms,n,rule){
   const po={};
   ms.forEach(m=>{if(m.rep==="a"||m.rep==="b"){const w=m.rep==="a"?m.x:m.y,l=m.rep==="a"?m.y:m.x;po[w+"-"+l]=1;po[l+"-"+w]=-1}});
   // 同点の決め方（4.2.3）：直接対決 → 勝数 → … → 代表戦。上の組が抜けたら、残りは1番から比べ直す（「2チームずつ、毎回1番から」に合わせる）
+  const allDone=ms.every(m=>m.done);
   const split=(G,key,dir)=>{const vals=[...new Set(G.map(key))].sort((u,v)=>dir*(v-u));return vals.map(v=>G.filter(t=>key(t)===v))};
   function resolve(G,why){
     if(G.length===1){G[0].why=why;return G}
@@ -229,6 +235,8 @@ function standings(teams,ms,n,rule){
     let P=split(G,hs,1),c="直接対決";
     if(P.length===1){c=null;
       for(const[k,sgn,lb]of CR){const Q=split(G,t=>t[k],sgn);if(Q.length>1){P=Q;c=lb;break}}}
+    // まだ試合が残っているときは代表戦にしない（並びは仮のまま、印も付けない）
+    if(P.length===1&&!allDone){G.sort((u,v)=>u.i-v.i);G.forEach(t=>t.why="");G[0].why=why;return G}
     if(P.length===1){c="代表戦";
       const ps=t=>G.reduce((v,o)=>v+(o.i!==t.i?(po[t.i+"-"+o.i]||0):0),0);
       P=split(G,ps,1);
@@ -533,7 +541,7 @@ function boot(){
     const ids=o?o.map(([r,b])=>pairIdx(r,b)):PR.map((_,i)=>i);
     return ids.map(i=>findMatch(mid(i)))};
   const sw=v=>v==="a"?"b":v==="b"?"a":v;
-  const swapBout=b=>b?Object.assign({},b,{a:b.b,b:b.a,o:sw(b.o),dq:sw(b.dq),h:(b.h||[]).map(x=>sw(x[0])+x[1])}):b;
+  const swapBout=b=>b?Object.assign({},b,{na:b.nb,nb:b.na,a:b.b,b:b.a,o:sw(b.o),dq:sw(b.dq),h:(b.h||[]).map(x=>sw(x[0])+x[1])}):b;
   const swapM=m=>Object.assign({},m,{q:sw(m.q),rep:sw(m.rep),bouts:(m.bouts||[]).map(swapBout)});
   const focus=()=>{const f=S.focus[S.cat+S.grp];return f==null?0:f};
   const store=m=>{const{x,y,id,flip,...rest}=m;S.ms[id]=flip?swapM(rest):rest;pushMatch(id)};
@@ -595,7 +603,9 @@ function boot(){
   }
 
   function pill(st){return st==="in"?'<span class="pill p-ok">確定</span>':st==="out"?'<span class="pill p-out">敗退</span>':""}
-  function render(){
+  function fillPn(){const set=new Set();Object.values(S.ms).forEach(m=>((m&&m.bouts)||[]).forEach(b=>{if(b){if(b.na)set.add(b.na);if(b.nb)set.add(b.nb)}}));
+    const dl=$("pnList");if(dl)dl.innerHTML=[...set].sort().map(x=>`<option value="${esc(x)}">`).join("")}
+  function render(){fillPn();
     const n=cfg().bouts,ms=matches(),tm=teams(),ko=S.mode==="k";
     $("modes").innerHTML=[["g","グループ"],["k","決勝T"]].map(([k,l])=>`<button data-mode="${k}" aria-pressed="${k===S.mode}">${l}</button>`).join("");
     $("cats").innerHTML=Object.entries(CATS).map(([k,c])=>`<button data-cat="${k}" aria-pressed="${k===S.cat}">${c.label}</button>`).join("");
@@ -761,7 +771,7 @@ function boot(){
   function boutHtml(i,k,nm,bt,A,B,cur){
     const w=bt.t?boutWinner(bt):null,sa=boutStat(bt);
     const res=!bt.t?"":w==="d"?"引分":(w==="a"?A:B)+" 勝ち";
-    const side=(c,name)=>`<div class="side ${c}"><div class="sc" aria-label="${name}の得点">${pts(sa[c])}</div><div class="pts">
+    const side=(c,name)=>`<div class="side ${c}"><input class="pn" data-pn="${i}:${k}:${c}" value="${esc(bt["n"+c]||"")}" placeholder="選手名" list="pnList" maxlength="30" autocomplete="off" aria-label="${esc(name)}の選手名"><div class="sc" aria-label="${name}の得点">${pts(sa[c])}</div><div class="pts">
       <button data-pt="${i}:${k}:${c}:y">有効<span>${bt[c].y}</span></button>
       <button data-pt="${i}:${k}:${c}:w">技あり<span>${bt[c].w}</span></button>
       <button data-pt="${i}:${k}:${c}:i">一本<span>${bt[c].i}</span></button></div></div>`;
@@ -787,14 +797,14 @@ function boot(){
     else if(d.cat){S.cat=d.cat;S.open=null}
     else if(d.grp){S.grp=d.grp;S.open=null}
     else if(d.open!=null){S.open=S.open===d.open?null:d.open}
-    else if(d.pt){const[m,k,c,t]=M(d.pt);const bt=getBout(m,+k);bt[c][t]++;bt.t=true;bt.o=null;(bt.h=bt.h||[]).push(c+t);store(m)}
-    else if(d.o){const[m,k,v]=M(d.o);const bt=getBout(m,+k);bt.t=true;bt.o=v==="d"?null:(bt.o===v?null:v);store(m)}
-    else if(d.dq){const[m,k,c]=M(d.dq);const bt=getBout(m,+k);bt.dq=bt.dq===c?null:c;bt.t=true;store(m)}
+    else if(d.pt){const[m,k,c,t]=M(d.pt);const bt=getBout(m,+k);bt[c][t]++;bt.t=true;bt.o=null;(bt.h=bt.h||[]).push(c+t);bt.ht=(bt.ht||[]).slice(0,bt.h.length-1);while(bt.ht.length<bt.h.length-1)bt.ht.push(0);bt.ht.push(Date.now());store(m)}
+    else if(d.o){const[m,k,v]=M(d.o);const bt=getBout(m,+k);bt.t=true;bt.o=v==="d"?null:(bt.o===v?null:v);bt.ot=bt.o?Date.now():0;store(m)}
+    else if(d.dq){const[m,k,c]=M(d.dq);const bt=getBout(m,+k);bt.dq=bt.dq===c?null:c;bt.dqt=bt.dq?Date.now():0;bt.t=true;store(m)}
     else if(d.undo){const[m,k]=M(d.undo);const bt=getBout(m,+k);
-      if(bt.h&&bt.h.length){const x=bt.h.pop();bt[x[0]][x[1]]--}else{m.bouts[+k]=null}
+      if(bt.h&&bt.h.length){const x=bt.h.pop();bt[x[0]][x[1]]--;if(bt.ht)bt.ht=bt.ht.slice(0,bt.h.length)}else{m.bouts[+k]=null}
       if(m.bouts[+k]&&!(bt.h&&bt.h.length)&&!bt.dq&&!bt.o)bt.t=false;store(m)}
-    else if(d.end){const m=findMatch(d.end);if(m.done){m.done=false;m.q=null}else m.done=true;store(m)}
-    else if(d.q){const[m,v]=M(d.q);m.q=v;m.done=true;store(m)}
+    else if(d.end){const m=findMatch(d.end);if(m.done){m.done=false;m.q=null;m.endAt=0}else{m.done=true;m.endAt=Date.now()}store(m)}
+    else if(d.q){const[m,v]=M(d.q);m.q=v;m.done=true;m.endAt=Date.now();store(m)}
     else if(d.reset){const id=d.reset;UNDO[id]=S.ms[id]?JSON.parse(JSON.stringify(S.ms[id])):null;delete S.ms[id];delete CUR[id];pushMatch(id)}
     else if(d.unreset){const id=d.unreset;if(UNDO[id])S.ms[id]=UNDO[id];else delete S.ms[id];delete UNDO[id];delete CUR[id];pushMatch(id)}
     else if(d.rep){const[m,v]=M(d.rep);m.rep=m.rep===v?null:v;store(m)}
@@ -834,7 +844,66 @@ function boot(){
     armed=false;$("resetBtn").textContent="このグループの結果を消す";
     pairings(5).forEach((_,i)=>{const id=mid(i);if(S.ms[id]){delete S.ms[id];pushMatch(id)}});S.open=null;saveLocal();render()});
   function sanitize(m){const num=x=>Math.max(0,Math.min(99,x|0)),side=s=>({y:num(s&&s.y),w:num(s&&s.w),i:num(s&&s.i)});
-    return{done:!!m.done,q:["a","b","d"].includes(m.q)?m.q:null,rep:["a","b"].includes(m.rep)?m.rep:null,bouts:(Array.isArray(m.bouts)?m.bouts:[]).slice(0,5).map(b=>b?{a:side(b.a),b:side(b.b),t:!!b.t,o:["a","b"].includes(b.o)?b.o:null,dq:["a","b"].includes(b.dq)?b.dq:null,h:(Array.isArray(b.h)?b.h:[]).filter(x=>/^[ab][ywi]$/.test(x))}:null)}}
+    return{done:!!m.done,q:["a","b","d"].includes(m.q)?m.q:null,rep:["a","b"].includes(m.rep)?m.rep:null,bouts:(Array.isArray(m.bouts)?m.bouts:[]).slice(0,5).map(b=>b?{a:side(b.a),b:side(b.b),t:!!b.t,o:["a","b"].includes(b.o)?b.o:null,dq:["a","b"].includes(b.dq)?b.dq:null,h:(Array.isArray(b.h)?b.h:[]).filter(x=>/^[ab][ywi]$/.test(x)),ht:(Array.isArray(b.ht)?b.ht:[]).slice(0,500).map(x=>Math.max(0,+x||0)),na:String(b.na||"").trim().slice(0,30),nb:String(b.nb||"").trim().slice(0,30),ot:Math.max(0,+b.ot||0),dqt:Math.max(0,+b.dqt||0)}:null),endAt:Math.max(0,+m.endAt||0)}}
+
+  document.addEventListener("change",e=>{const t=e.target.closest("input[data-pn]");if(!t)return;
+    const[id,k,c]=t.dataset.pn.split(":"),m=findMatch(id),bt=getBout(m,+k),v=t.value.trim().slice(0,30);
+    if(v)bt["n"+c]=v;else delete bt["n"+c];store(m);fillPn()});
+  /* ---------- 分析用CSV：1行＝1つの得点 ---------- */
+  const two=x=>String(x).padStart(2,"0");
+  const fmtT=ms=>{if(!ms)return"";const d=new Date(ms);return `${d.getFullYear()}-${two(d.getMonth()+1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`};
+  const csvCell=v=>{const t=v==null?"":String(v);return /[",\r\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t};
+  const PTN={y:"有効",w:"技あり",i:"一本"},PTV={y:1,w:2,i:3};
+  function buildCsv(){
+    const head=["種目","ステージ","組・回戦","試合順","赤チーム","青チーム","本","本の番号","赤選手","青選手","得点順","得点した側","得点チーム","得点選手","種類","点数","赤の累計","青の累計","入力時刻","本の赤得点","本の青得点","先取","失格・棄権","本の勝者","試合の赤勝数","試合の青勝数","試合の赤総得点","試合の青総得点","試合の結果","試合終了の入力時刻"];
+    const rows=[head];
+    const side=x=>x==="a"?"赤":x==="b"?"青":"";
+    function emit(cat,stage,grp,no,m,A,B,resTxt){
+      const n=CATS[cat].bouts,nm=CATS[cat].names,st=matchStat(m,n);
+      const mcols=[st.wa,st.wb,st.pa,st.pb,resTxt,fmtT(m.endAt)];
+      const base=[CATS[cat].label,stage,grp,no,A,B];
+      let any=false;
+      for(let k=0;k<n;k++){const bt=(m.bouts||[])[k];
+        if(!bt||(!bt.t&&!(bt.h&&bt.h.length)&&!bt.na&&!bt.nb))continue;any=true;
+        const s=boutStat(bt),w=bt.t?boutWinner(bt):"";
+        const wTxt=w==="a"?"赤":w==="b"?"青":w==="d"?"引分":"";
+        const bcols=[pts(s.a),pts(s.b),bt.o?side(bt.o)+(bt.ot?"（"+fmtT(bt.ot)+"）":""):"",bt.dq?side(bt.dq)+(bt.dqt?"（"+fmtT(bt.dqt)+"）":""):"",wTxt];
+        const pre=[...base,nm[k],k+1,bt.na||"",bt.nb||""];
+        const h=bt.h||[];let ca=0,cb=0;
+        if(!h.length)rows.push([...pre,"","","","","","","","","",...bcols,...mcols]);
+        h.forEach((x,j)=>{const c=x[0],t=x[1];if(c==="a")ca+=PTV[t];else cb+=PTV[t];
+          rows.push([...pre,j+1,side(c),c==="a"?A:B,c==="a"?(bt.na||""):(bt.nb||""),PTN[t],PTV[t],ca,cb,fmtT((bt.ht||[])[j]),...bcols,...mcols])});
+      }
+      if(!any&&(m.q||m.done))rows.push([...base,"結果のみ","","","","","","","","","","","","","","","","","",...mcols]);
+    }
+    ["M","F"].forEach(cat=>{const n=CATS[cat].bouts;
+      Object.keys(CATS[cat].groups).forEach(g=>{const tm=teamsOf(cat,g),o=getOrd(cat+"_"+g);
+        const ids=o?o.map(([r,b])=>pairIdx(r,b)):PR.map((_,i)=>i);
+        ids.forEach((i,j)=>{const m=findMatch(cat+"_"+g+"_"+i);
+          const r=m.done?matchResult(m,n,S.rule):null;
+          emit(cat,"グループ",g+"組",o?j+1:"",m,tm[m.x],tm[m.y],r==="a"?"赤勝ち":r==="b"?"青勝ち":r==="d"?"引分":"未終了")})});
+      const R=koTeams(cat);
+      KO.forEach(([id,lab])=>{const r=R[id],m=r.m;
+        const rt=r.win?((m.rep?"代表戦で":"")+(r.win==="a"?"赤勝ち":"青勝ち")):r.tie?"代表戦待ち":"未終了";
+        emit(cat,"決勝トーナメント",lab,"",m,tName(r.A),tName(r.B),rt)})});
+    return rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+  }
+  $("csvOut").addEventListener("click",async()=>{
+    const csv=buildCsv(),lines=csv.split("\r\n").length-1;
+    if(!lines){$("setmsg").textContent="まだ入力がありません。";return}
+    const d=new Date(),fn=`toppa_${d.getFullYear()}${two(d.getMonth()+1)}${two(d.getDate())}_${two(d.getHours())}${two(d.getMinutes())}.csv`;
+    const blob=new Blob(["﻿"+csv],{type:"text/csv"});
+    // claude.ai の中で開いたとき（試験版）は、claude.ai の保存の仕組みを使う
+    const dl=(window.claude&&claude.use)?await claude.use("downloads").catch(()=>null):null;
+    if(dl){try{await dl.save({filename:fn,data:blob});$("setmsg").textContent=`CSV（${lines}行）を保存しました：${fn}`;return}
+      catch(e){if(e&&e.code==="declined"){$("setmsg").textContent="保存をやめました。";return}}}
+    try{const f=new File([blob],fn,{type:"text/csv"});
+      if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:fn});$("setmsg").textContent=`CSV（${lines}行）を送りました。`;return}}
+    catch(e){if(e&&e.name==="AbortError"){$("setmsg").textContent="送るのをやめました。";return}}
+    try{const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
+      $("setmsg").textContent=`CSV（${lines}行）を保存しました：${fn}`}
+    catch(e){try{await navigator.clipboard.writeText(csv);$("setmsg").textContent="ファイルにできなかったので、CSVの文字をコピーしました。メモ等に貼り付けてください。"}catch(x){$("setmsg").textContent="CSVを出せませんでした。"}}
+  });
 
   /* ---------- AIに質問：表示中の組の入力と計算結果を文章にして渡す ---------- */
   const RULES=`あなたは2026 Karate World Cup（杭州）団体組手のグループ戦を見ている日本チームのアナリストの補助です。
