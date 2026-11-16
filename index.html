@@ -491,6 +491,7 @@ function boot(){
     const show=(c,t)=>{el.style.borderColor=c;el.style.color=c;el.textContent=t};
     const base=ok?"計算OK・入力はこの携帯に保存されます":"計算OK。ただし入力が保存されません（閉じると消える）。終わったら「設定と控え」→「今のデータを出してコピー」で控えを取ってください。";
     const col=ok?"#2e7d32":"#b26a00";
+    if(window.claude&&window.claude.use){show(col,base+"／オンライン版：電波があれば他の端末と同期・AIに質問できます");return}
     if(!("serviceWorker" in navigator)){show("#b26a00",base+"／この開き方ではネットなしの準備ができません（Safariで開いてください）");return}
     show(col,base+"／ネットなしの準備中…");
     navigator.serviceWorker.register("sw.js").then(()=>navigator.serviceWorker.ready).then(()=>{
@@ -617,19 +618,19 @@ function boot(){
     let v;
     if(a.state==="in")v=`<span style="color:var(--ok)">突破確定</span>`;
     else if(a.state==="out")v=`<span style="color:var(--out)">突破の可能性なし</span>`;
-    else if(a.need!=null)v=`あと<b>${a.need}</b>点で突破確定`;
+    else if(a.need!=null)v=`勝ち点あと<b>${a.need}</b>で突破確定`;
     else v=a.mine?`全勝しても他の試合次第`:`他の試合次第`;
-    const sub=a.state==="open"?`現在 ${a.current}点・残り${a.mine}試合${a.minLive>0?`。最低あと${a.minLive}点で可能性が残る`:""}`:`現在 ${a.current}点・残り${a.mine}試合`;
+    const sub=a.state==="open"?`現在 勝ち点${a.current}・残り${a.mine}試合${a.minLive>0?`。最低あと勝ち点${a.minLive}で可能性が残る`:""}`:`現在 勝ち点${a.current}・残り${a.mine}試合`;
     const rows=a.state==="open"?a.rows.map(r=>{
       const st=(!r.chance&&!r.no)?'<span class="pill p-ok">確定</span>':(!r.sure&&!r.chance)?'<span class="pill p-out">敗退</span>':(!r.sure&&!r.no)?'<span class="pill p-warn">同点の順位次第</span>':'<span class="pill p-warn">他の結果次第</span>';
-      return `<div class="row"><span>あと${r.g}点 <small style="color:var(--muted)">${recordsFor(r.g,a.mine)}</small></span>${st}</div>`}).join(""):"";
+      return `<div class="row"><span>勝ち点あと${r.g} <small style="color:var(--muted)">${recordsFor(r.g,a.mine)}</small></span>${st}</div>`}).join(""):"";
     $("judge").innerHTML=`<label for="focusSel"><h2>どのチームで計算するか</h2></label>
       <select id="focusSel">${tm.map((t,i)=>`<option value="${i}" ${i===f?"selected":""}>${t}</option>`).join("")}</select>
       <div class="verdict">${v}</div><p class="note">${sub}</p>
       ${rows?`<div class="rows">${rows}</div>`:""}${scoreHtml(tm,ms,f,n)}`;
     // 順位表
     const st=standings(tm,ms,n,S.rule);
-    $("table").innerHTML=`<table><thead><tr><th>順</th><th style="text-align:left">チーム</th><th>点</th><th>勝分負</th><th>個人勝</th><th>得失</th></tr></thead><tbody>`+
+    $("table").innerHTML=`<table><thead><tr><th>順</th><th style="text-align:left">チーム</th><th>勝ち点</th><th>勝分負</th><th>個人勝</th><th>得失</th></tr></thead><tbody>`+
       st.map(s=>{const x=analyse(tm,ms,s.i,n,S.rule);return `<tr class="${s.i===f?"me":""}"><td>${s.rank}</td><td class="t">${s.name}${pill(x.state)}<div class="sub"><span>一本 ${s.if}-${s.ia}</span> <span>技あり ${s.zf}-${s.za}</span></div></td><td class="vp">${s.vp}</td><td>${s.w}-${s.d}-${s.l}</td><td>${s.bw}</td><td>${s.pf}-${s.pa}</td></tr>`}).join("")+`</tbody></table><p class="note">得失・一本・技あり は 取った数-取られた数。</p>`;
     const whys=st.filter(s=>s.why).map(s=>`${s.rank}位 ${s.name}：${s.undecided?"代表戦待ち":s.why+"で下"}`);
     const qk=st.some(s=>s.quick);
@@ -692,6 +693,15 @@ function boot(){
     if(cand.length>=2)out.push(`3チーム以上で並んで直接対決が勝ち負け同数なら、個人戦の勝数→総得点：`+cand.map(({r})=>`${r.name}に${need(r)}`).join("／"));
     return out;
   }
+  // 同じ組で同時に入力中の試合（他コート）を「今のまま終われば」で計算に入れた条件
+  const liveOthers=(ms,m,n)=>ms.filter(x=>x.id!==m.id&&!x.done&&!x.q&&matchStat(x,n).played>0);
+  function otherLive(tm,ms,f,n,m){
+    const oth=liveOthers(ms,m,n);if(!oth.length)return[];
+    const ms2=ms.map(x=>oth.includes(x)?Object.assign({},x,{done:true}):x);
+    const q2=qualTarget(tm,ms2,f,n,m);
+    const lab=oth.map(x=>{const s=matchStat(x,n);return `${tm[x.x]} ${s.wa}-${s.wb} ${tm[x.y]}`}).join("、");
+    return[`他コート（${lab}）が今のまま終われば：${q2?q2.txt:"この試合の結果に関係なく決まる"}`];
+  }
   function liveText(m,n,A,B,tm,ms,ko){
     const f=ko?null:focus();
     const me=(!ko&&m.y===f)?"b":"a",T=me==="a"?A:B,O=me==="a"?B:A;
@@ -700,6 +710,7 @@ function boot(){
     const lines=[];
     if(q)lines.push(`<b>${T}：${q.txt}</b>`);
     if(q&&q.tie)tieLines(tm,ms,f,n,m).forEach(t=>lines.push(`・${t}`));
+    if(q)otherLive(tm,ms,f,n,m).forEach(t=>lines.push(t));
     if(L.done){lines.push(`${T} の${L.done}`);return lines.join("<br>")}
     if(L.bout){
       const word=["負け","引分","勝ち"],nowW=word[L.now];
@@ -759,9 +770,11 @@ function boot(){
     const maj=Math.floor(n/2)+1,left=n-s.played;
     const live=m.done?`${lab}`:liveText(m,n,A,B,tm,matches(),false);
     const id=m.id,ck=m.done?-1:curBout(m,n),box=nowHtml(m,n,A,B,live,m.y===focus());
+    const oth=liveOthers(matches(),m,n);
+    const sw2=oth.length?`<div class="actions">${oth.map(x=>{const s2=matchStat(x,n);return `<button class="small" data-open="${x.id}">同時進行 → ${tm[x.x]} ${s2.wa}-${s2.wb} ${tm[x.y]} を入力</button>`}).join("")}</div>`:"";
     const bouts=cfg().names.map((nm,k)=>(k===ck?box:"")+boutHtml(id,k,nm,(m.bouts||[])[k]||emptyBout(),A,B,k===ck)).join("");
     return head+`<div class="editor">
-      ${m.done?`<div class="live">${live}</div>`:""}${bouts}
+      ${sw2}${m.done?`<div class="live">${live}</div>`:""}${bouts}
       <div class="actions"><button class="primary" data-end="${id}">${m.done?"終了を取り消す":"試合終了にする"}</button></div>
       ${resetHtml(id)}
       <details><summary>個人戦を入れずに結果だけ入れる</summary><div class="actions">
@@ -813,6 +826,8 @@ function boot(){
   });
   $("judge").addEventListener("change",e=>{if(e.target.id==="focusSel"){S.focus[S.cat+S.grp]=+e.target.value;saveLocal();render()}});
   const pushNames=async()=>{if(db){try{await db.doc("settings/names").set({names:S.names})}catch(x){}}};
+  const pushOrders=async()=>{if(db){try{await db.doc("settings/orders").set({json:JSON.stringify(S.orders)})}catch(x){}}};
+  const pushKo=async()=>{if(db){try{await db.doc("settings/ko").set({json:JSON.stringify(S.koNames)})}catch(x){}}};
   $("tnSave").addEventListener("click",()=>{const k=S.cat+"_"+S.grp,d=CATS[S.cat].groups[S.grp];
     const v=[0,1,2,3,4].map(i=>($("tn"+i).value||"").trim().slice(0,20)||d[i]);
     if(v.every((x,i)=>x===d[i]))delete S.names[k];else S.names[k]=v;
@@ -824,19 +839,19 @@ function boot(){
     else if(t.dataset.od!=null){i=+t.dataset.od;if(i>=a.length-1)return;[a[i+1],a[i]]=[a[i],a[i+1]];msg=`${i+1}試合目と${i+2}試合目を入れ替えました。`}
     else if(t.dataset.os!=null){i=+t.dataset.os;a[i].reverse();msg=`${i+1}試合目の赤青を入れ替えました。`}
     else return;
-    S.orders[k]=a;S.open=null;saveLocal();render();$("setmsg").textContent=msg});
-  $("ordReset").addEventListener("click",()=>{delete S.orders[S.cat+"_"+S.grp];S.open=null;saveLocal();render();$("setmsg").textContent="試合順を元に戻しました。"});
+    S.orders[k]=a;S.open=null;saveLocal();render();pushOrders();$("setmsg").textContent=msg});
+  $("ordReset").addEventListener("click",()=>{delete S.orders[S.cat+"_"+S.grp];S.open=null;saveLocal();render();pushOrders();$("setmsg").textContent="試合順を元に戻しました。"});
   $("ko").addEventListener("change",e=>{const t=e.target.closest("select[data-kon]");if(!t)return;
     const[k,s]=t.dataset.kon.split(":"),o=Object.assign({},S.koNames[k]||{});
     if(t.value)o[s]=t.value;else delete o[s];
-    if(o.a||o.b)S.koNames[k]=o;else delete S.koNames[k];saveLocal();render()});
+    if(o.a||o.b)S.koNames[k]=o;else delete S.koNames[k];saveLocal();render();pushKo()});
   $("tieRule").addEventListener("change",async e=>{S.rule=e.target.value;saveLocal();render();
     if(db){try{await db.doc("settings/main").set({rule:S.rule})}catch(x){}}});
   $("bkCopy").addEventListener("click",async()=>{const t=JSON.stringify({ms:S.ms,rule:S.rule,names:S.names,orders:S.orders,koNames:S.koNames});$("backup").value=t;
     try{await navigator.clipboard.writeText(t);$("setmsg").textContent="コピーしました。"}catch(e){$("backup").select();$("setmsg").textContent="欄の文字を選択しました。手でコピーしてください。"}});
   $("bkLoad").addEventListener("click",()=>{try{const v=JSON.parse($("backup").value);if(!v||typeof v.ms!=="object")throw 0;
       const clean={};Object.keys(v.ms).forEach(k=>{if(IDRE.test(k))clean[k]=sanitize(v.ms[k])});
-      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders)S.orders=cleanOrders(v.orders);if(v.koNames)S.koNames=cleanKo(v.koNames);Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
+      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders){S.orders=cleanOrders(v.orders);pushOrders()}if(v.koNames){S.koNames=cleanKo(v.koNames);pushKo()}Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
     catch(e){$("setmsg").textContent="読み込めません。コピーした文字をそのまま貼り付けてください。"}});
   let armed=false;
   $("resetBtn").addEventListener("click",()=>{
@@ -929,7 +944,7 @@ function boot(){
   function boutLines(m,A,B){
     const out=[];
     cfg().names.forEach((nm,k)=>{const bt=(m.bouts||[])[k];if(!bt||!bt.t)return;const w=boutWinner(bt),sa=boutStat(bt);
-      out.push(`    ${nm}：${A} ${pts(sa.a)}点（${sideTxt(bt.a)}） - ${B} ${pts(sa.b)}点（${sideTxt(bt.b)}）${bt.dq?`、${bt.dq==="a"?A:B}が失格・棄権`:""}${bt.o?`、${bt.o==="a"?A:B}の先取`:""} → ${w==="d"?"引分":(w==="a"?A:B)+"の勝ち"}`)});
+      out.push(`    ${nm}${bt.na||bt.nb?`（${A}：${bt.na||"名前なし"}、${B}：${bt.nb||"名前なし"}）`:""}：${A} ${pts(sa.a)}点（${sideTxt(bt.a)}） - ${B} ${pts(sa.b)}点（${sideTxt(bt.b)}）${bt.dq?`、${bt.dq==="a"?A:B}が失格・棄権`:""}${bt.o?`、${bt.o==="a"?A:B}の先取`:""} → ${w==="d"?"引分":(w==="a"?A:B)+"の勝ち"}`)});
     return out;
   }
   function aiContext(){
@@ -949,8 +964,8 @@ function boot(){
     lines.push("","ページの計算結果（終了した試合だけで計算）：","順位表：");
     st.forEach(s=>lines.push(`  ${s.rank}位 ${s.name}：勝ち点${s.vp}、${s.w}勝${s.d}分${s.l}敗、個人戦の勝数${s.bw}、得点${s.pf}・失点${s.pa}、一本${s.if}・被一本${s.ia}、技あり${s.zf}・被技あり${s.za}${s.why?`（前の順位のチームとは${s.why}で差）`:""}`));
     const a=analyse(tm,ms,f,n,S.rule);
-    lines.push(`${tm[f]}の判定：${a.state==="in"?"突破確定":a.state==="out"?"突破の可能性なし":a.need!=null?`あと${a.need}点で突破確定`:a.mine?"全勝しても他の試合次第":"他の試合次第"}（現在${a.current}点、残り${a.mine}試合）`);
-    a.rows.forEach(r=>lines.push(`  あと${r.g}点（${recordsFor(r.g,a.mine)}）：残り試合の全パターンのうち 確定${r.sure}・同点の順位次第${r.chance}・敗退${r.no}`));
+    lines.push(`${tm[f]}の判定：${a.state==="in"?"突破確定":a.state==="out"?"突破の可能性なし":a.need!=null?`勝ち点あと${a.need}で突破確定`:a.mine?"全勝しても他の試合次第":"他の試合次第"}（現在 勝ち点${a.current}、残り${a.mine}試合）`);
+    a.rows.forEach(r=>lines.push(`  勝ち点あと${r.g}（${recordsFor(r.g,a.mine)}）：残り試合の全パターンのうち 確定${r.sure}・同点の順位次第${r.chance}・敗退${r.no}`));
     const sc=finalScenarios(tm,ms,f,n,S.rule);
     if(sc){lines.push(`最終戦（対 ${sc.opp}）の条件：`);sc.out.forEach(o=>{lines.push(`  ${o.lab}：${o.head}`);o.lines.forEach(l=>lines.push(`    ${l}`))})}
     const rs=restScenarios(tm,ms,f,n,S.rule,labOf(ms,tm));
@@ -1016,6 +1031,9 @@ function boot(){
       first=false;setSync("共有して保存済み");saveLocal();render();
     },()=>setSync("共有できません（この端末には保存）"));
     db.doc("settings/names").onSnapshot(s=>{if(s.exists){S.names=cleanNames(s.data().names);saveLocal();render()}},()=>{});
+    const js=t=>{try{return JSON.parse(t||"{}")}catch(e){return{}}};
+    db.doc("settings/orders").onSnapshot(s=>{if(s.exists){S.orders=cleanOrders(js(s.data().json));saveLocal();render()}else if(Object.keys(S.orders).length)pushOrders()},()=>{});
+    db.doc("settings/ko").onSnapshot(s=>{if(s.exists){S.koNames=cleanKo(js(s.data().json));saveLocal();render()}else if(Object.keys(S.koNames).length)pushKo()},()=>{});
     db.doc("settings/main").onSnapshot(s=>{const r=s.exists&&s.data().rule;if(r==="bouts"||r==="points"){S.rule=r;saveLocal();render()}},()=>{});
   })();
 }
