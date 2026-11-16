@@ -24,7 +24,7 @@ sw = rd("sw.js"); v = re.search(r'const C="toppa-([^"]+)"', sw).group(1)
 wr("sw.js", sw.replace(f'toppa-{v}', f'toppa-practice-{v}'))
 wr("robots.txt", rd("robots.txt"))
 font = next(f for f in [r"C:\Windows\Fonts\YuGothB.ttc", r"C:\Windows\Fonts\meiryob.ttc", r"C:\Windows\Fonts\msgothic.ttc"] if os.path.exists(f))
-for n in (180, 512):
+for n in (180, 192, 512):
     im = Image.new("RGB", (n, n), BLUE); d = ImageDraw.Draw(im); f = ImageFont.truetype(font, int(n * 0.36))
     for i, ch in enumerate("練習"):
         d.text((n / 2, n * (0.29 + 0.43 * i)), ch, font=f, fill="white", anchor="mm")
