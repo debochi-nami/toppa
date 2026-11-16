@@ -74,6 +74,7 @@ td .pill{margin-left:4px}
 .pts button{padding:2px;min-height:44px;font-size:12px;font-weight:700;line-height:1.1}
 .pts button span{display:block;font-family:var(--num);font-size:15px}
 .tie{display:flex;gap:4px;flex-wrap:wrap}
+.tie .sen{flex:1 1 30%;font-size:12px;align-self:center;font-weight:600}
 .tie button{flex:1 1 30%;font-size:12px;min-height:36px;padding:2px 4px}
 .tie button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .small{font-size:12px;min-height:34px}
@@ -181,9 +182,9 @@ function pts(s){return s.y+2*s.w+3*s.i}
 function boutWinner(bt){
   if(bt.dq)return bt.dq==="a"?"b":"a";
   const x=pts(bt.a),y=pts(bt.b);
-  if(bt.o==="a"||bt.o==="b")return bt.o;   // 先取・判定の手動指定
   if(x>y)return"a"; if(y>x)return"b";
-  return ipw(bt)||"d";   // 同点・先取なし → 一本の多いほう → 技ありの多いほう → 引分（WKF 組手競技規定 12.2.3〜12.2.5）
+  if(bt.o==="a"||bt.o==="b")return bt.o;   // 同点なら先取（最初に得点した側。取り消し・手動指定あり）
+  return"d";   // 同点で先取なし → 引分（団体戦の個人戦。一本・技ありの数は使わない：ダイスケ 11/16。数はグループの勝ち点が並んだときだけ使う）
 }
 function ipw(bt){const a=bt.a||{},b=bt.b||{};
   if((a.i|0)!==(b.i|0))return(a.i|0)>(b.i|0)?"a":"b";
@@ -274,7 +275,10 @@ function analyse(teams,ms,focus,n,rule){
     vp[m.x]++;vp[m.y]++;rec(k+1);vp[m.x]--;vp[m.y]--;
     vp[m.y]+=3;rec(k+1);vp[m.y]-=3;
   })(0);
-  const rows=[...byGain.entries()].sort((a,b)=>a[0]-b[0]).map(([g,e])=>({g,...e}));
+  let rows=[...byGain.entries()].sort((a,b)=>a[0]-b[0]).map(([g,e])=>({g,...e}));
+  // 全試合が終わったら、勝ち点で並んでいても順位表の同点の決め方（直接対決・勝数…）で確定／敗退を出す。3位が代表戦待ちならそのまま
+  if(!rest.length){const st=standings(teams,ms,n,rule),pos=st.findIndex(s=>s.i===focus);
+    if(!(st[2]&&st[2].undecided)){const ok=pos<2;rows=[{g:0,sure:ok?1:0,chance:0,no:ok?0:1}]}}
   let need=null;
   for(let i=rows.length-1;i>=0;i--){if(!rows[i].chance&&!rows[i].no)need=rows[i].g;else break}
   const live=rows.find(r=>r.sure+r.chance>0);
@@ -449,7 +453,7 @@ function liveNeed(m,n,me,rule,ko){
     const s0=matchStat(m,n-1),w0=me==="a"?s0.wa:s0.wb,l0=me==="a"?s0.wb:s0.wa,d0=(me==="a"?s0.pa-s0.pb:s0.pb-s0.pa);
     if(w0>=maj)return{done:ko?"勝ち":"勝ちが確定"};if(l0>=maj)return{done:ko?"負け":"負けが確定"};
     const px=last&&last.t?pts(last[me]):0,py=last&&last.t?pts(last[op]):0;
-    const iw=last&&last.t?ipw(last):null,tb=iw===me?1:iw===op?-1:0;
+    const tb=0;
     const res=(x,y,sen)=>{const bt=x>y?1:x<y?-1:sen===me?1:sen===op?-1:tb;
       const bw=w0+(bt>0),bl=l0+(bt<0);if(bw>bl)return 2;if(bw<bl)return 0;
       if(!ko&&rule==="bouts")return 1;const t=d0+x-y;return t>0?2:t<0?0:1};
@@ -618,6 +622,7 @@ function boot(){
     let v;
     if(a.state==="in")v=`<span style="color:var(--ok)">突破確定</span>`;
     else if(a.state==="out")v=`<span style="color:var(--out)">突破の可能性なし</span>`;
+    else if(ms.every(m=>m.done))v="代表戦の結果次第";
     else if(a.need!=null)v=`勝ち点あと<b>${a.need}</b>で突破確定`;
     else v=a.mine?`全勝しても他の試合次第`:`他の試合次第`;
     const sub=a.state==="open"?`現在 勝ち点${a.current}・残り${a.mine}試合${a.minLive>0?`。最低あと勝ち点${a.minLive}で可能性が残る`:""}`:`現在 勝ち点${a.current}・残り${a.mine}試合`;
@@ -792,7 +797,7 @@ function boot(){
     return `<div class="bout" data-bk="${i}:${k}"><button class="bh" data-cur="${i}:${k}"><span>${nm}</span><span>${res}</span></button>
       <div class="sides">${side("a",A)}${side("b",B)}</div>
       <div class="tie">
-        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">${ipw(bt)?`このまま終了（${ipw(bt)==="a"?A:B} の勝ち：${(bt.a.i|0)!==(bt.b.i|0)?"一本":"技あり"}が多い）`:"引分で終了"}</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:""}
+        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">${bt.o?"先取なしで終了（引分）":"引分で終了"}</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:bt.o?`<span class="sen">先取：${bt.o==="a"?A:B}</span><button data-o="${i}:${k}:${bt.o}">先取を取り消す</button>`:bt.h&&bt.h.length?`<span class="sen">先取なし</span><button data-o="${i}:${k}:a">${A} に先取</button><button data-o="${i}:${k}:b">${B} に先取</button>`:""}
         <button data-undo="${i}:${k}">1つ戻す</button>
         <button data-dq="${i}:${k}:a" aria-pressed="${bt.dq==="a"}">${A} 失格・棄権</button><button data-dq="${i}:${k}:b" aria-pressed="${bt.dq==="b"}">${B} 失格・棄権</button>
       </div></div>`;
@@ -810,11 +815,11 @@ function boot(){
     else if(d.cat){S.cat=d.cat;S.open=null}
     else if(d.grp){S.grp=d.grp;S.open=null}
     else if(d.open!=null){S.open=S.open===d.open?null:d.open}
-    else if(d.pt){const[m,k,c,t]=M(d.pt);const bt=getBout(m,+k);bt[c][t]++;bt.t=true;bt.o=null;(bt.h=bt.h||[]).push(c+t);bt.ht=(bt.ht||[]).slice(0,bt.h.length-1);while(bt.ht.length<bt.h.length-1)bt.ht.push(0);bt.ht.push(Date.now());store(m)}
-    else if(d.o){const[m,k,v]=M(d.o);const bt=getBout(m,+k);bt.t=true;bt.o=v==="d"?null:(bt.o===v?null:v);bt.ot=bt.o?Date.now():0;store(m)}
+    else if(d.pt){const[m,k,c,t]=M(d.pt);const bt=getBout(m,+k);bt[c][t]++;bt.t=true;if(!(bt.h&&bt.h.length)&&!bt.o){bt.o=c;bt.ot=Date.now();bt.oa=1}(bt.h=bt.h||[]).push(c+t);bt.ht=(bt.ht||[]).slice(0,bt.h.length-1);while(bt.ht.length<bt.h.length-1)bt.ht.push(0);bt.ht.push(Date.now());store(m)}
+    else if(d.o){const[m,k,v]=M(d.o);const bt=getBout(m,+k);bt.t=true;bt.o=v==="d"?null:(bt.o===v?null:v);bt.ot=bt.o?Date.now():0;bt.oa=0;store(m)}
     else if(d.dq){const[m,k,c]=M(d.dq);const bt=getBout(m,+k);bt.dq=bt.dq===c?null:c;bt.dqt=bt.dq?Date.now():0;bt.t=true;store(m)}
     else if(d.undo){const[m,k]=M(d.undo);const bt=getBout(m,+k);
-      if(bt.h&&bt.h.length){const x=bt.h.pop();bt[x[0]][x[1]]--;if(bt.ht)bt.ht=bt.ht.slice(0,bt.h.length)}else{m.bouts[+k]=null}
+      if(bt.h&&bt.h.length){const x=bt.h.pop();bt[x[0]][x[1]]--;if(bt.ht)bt.ht=bt.ht.slice(0,bt.h.length);if(!bt.h.length&&bt.oa){bt.o=null;bt.ot=0;bt.oa=0}}else{m.bouts[+k]=null}
       if(m.bouts[+k]&&!(bt.h&&bt.h.length)&&!bt.dq&&!bt.o)bt.t=false;store(m)}
     else if(d.end){const m=findMatch(d.end);if(m.done){m.done=false;m.q=null;m.endAt=0}else{m.done=true;m.endAt=Date.now()}store(m)}
     else if(d.q){const[m,v]=M(d.q);m.q=v;m.done=true;m.endAt=Date.now();store(m)}
@@ -859,7 +864,7 @@ function boot(){
     armed=false;$("resetBtn").textContent="このグループの結果を消す";
     pairings(5).forEach((_,i)=>{const id=mid(i);if(S.ms[id]){delete S.ms[id];pushMatch(id)}});S.open=null;saveLocal();render()});
   function sanitize(m){const num=x=>Math.max(0,Math.min(99,x|0)),side=s=>({y:num(s&&s.y),w:num(s&&s.w),i:num(s&&s.i)});
-    return{done:!!m.done,q:["a","b","d"].includes(m.q)?m.q:null,rep:["a","b"].includes(m.rep)?m.rep:null,bouts:(Array.isArray(m.bouts)?m.bouts:[]).slice(0,5).map(b=>b?{a:side(b.a),b:side(b.b),t:!!b.t,o:["a","b"].includes(b.o)?b.o:null,dq:["a","b"].includes(b.dq)?b.dq:null,h:(Array.isArray(b.h)?b.h:[]).filter(x=>/^[ab][ywi]$/.test(x)),ht:(Array.isArray(b.ht)?b.ht:[]).slice(0,500).map(x=>Math.max(0,+x||0)),na:String(b.na||"").trim().slice(0,30),nb:String(b.nb||"").trim().slice(0,30),ot:Math.max(0,+b.ot||0),dqt:Math.max(0,+b.dqt||0)}:null),endAt:Math.max(0,+m.endAt||0)}}
+    return{done:!!m.done,q:["a","b","d"].includes(m.q)?m.q:null,rep:["a","b"].includes(m.rep)?m.rep:null,bouts:(Array.isArray(m.bouts)?m.bouts:[]).slice(0,5).map(b=>b?{a:side(b.a),b:side(b.b),t:!!b.t,o:["a","b"].includes(b.o)?b.o:null,dq:["a","b"].includes(b.dq)?b.dq:null,h:(Array.isArray(b.h)?b.h:[]).filter(x=>/^[ab][ywi]$/.test(x)),ht:(Array.isArray(b.ht)?b.ht:[]).slice(0,500).map(x=>Math.max(0,+x||0)),na:String(b.na||"").trim().slice(0,30),nb:String(b.nb||"").trim().slice(0,30),ot:Math.max(0,+b.ot||0),oa:b.oa?1:0,dqt:Math.max(0,+b.dqt||0)}:null),endAt:Math.max(0,+m.endAt||0)}}
 
   document.addEventListener("change",e=>{const t=e.target.closest("input[data-pn]");if(!t)return;
     const[id,k,c]=t.dataset.pn.split(":"),m=findMatch(id),bt=getBout(m,+k),v=t.value.trim().slice(0,30);
@@ -923,7 +928,7 @@ function boot(){
   /* ---------- AIに質問：表示中の組の入力と計算結果を文章にして渡す ---------- */
   const RULES=`あなたは2026 Karate World Cup（杭州）団体組手のグループ戦を見ている日本チームのアナリストの補助です。
 ルール：各組5チームの総当たり。上位2チームが準々決勝。1試合は男子5本・女子3本で、グループ戦は勝敗が決まっても全部行う。
-試合の勝ち点は 勝ち3・引分1・負け0。個人戦の得点は 有効1・技あり2・一本3。失格・棄権は相手に8点、本人0点として数える。
+試合の勝ち点は 勝ち3・引分1・負け0。個人戦の得点は 有効1・技あり2・一本3。失格・棄権は相手に8点、本人0点として数える。個人戦（1本）は得点の多いほうの勝ち、同点なら先取（最初に得点した選手。取り消しあり）のほうの勝ち、先取がなければ引分（一本・技ありの数では決めない）。
 同点の順位は 直接対決の勝者 → 個人戦の勝数 → 総得点 → 総失点（少ないほう） → 一本の数 → 被一本（少ないほう） → 技あり → 被技あり（少ないほう） → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは、上のチームが抜けるたびに残りのチームを直接対決から比べ直す。
 決勝トーナメント（準々決勝・準決勝・3位決定戦・決勝）は、どちらかが個人戦の過半数に勝った時点で試合終了。全部戦って勝数が同じなら総得点の多いほう、それも同じなら代表戦。
 答え方：日本語で、結論を最初に1〜2文。そのあと根拠を短い箇条書きで。数字は下の「現在のデータ」と「ページの計算結果」だけを使い、推測で結果を作らない。分からないこと（未入力の試合の結果など）は分からないと言う。スマホで読むので短く。`;
@@ -964,7 +969,7 @@ function boot(){
     lines.push("","ページの計算結果（終了した試合だけで計算）：","順位表：");
     st.forEach(s=>lines.push(`  ${s.rank}位 ${s.name}：勝ち点${s.vp}、${s.w}勝${s.d}分${s.l}敗、個人戦の勝数${s.bw}、得点${s.pf}・失点${s.pa}、一本${s.if}・被一本${s.ia}、技あり${s.zf}・被技あり${s.za}${s.why?`（前の順位のチームとは${s.why}で差）`:""}`));
     const a=analyse(tm,ms,f,n,S.rule);
-    lines.push(`${tm[f]}の判定：${a.state==="in"?"突破確定":a.state==="out"?"突破の可能性なし":a.need!=null?`勝ち点あと${a.need}で突破確定`:a.mine?"全勝しても他の試合次第":"他の試合次第"}（現在 勝ち点${a.current}、残り${a.mine}試合）`);
+    lines.push(`${tm[f]}の判定：${a.state==="in"?"突破確定":a.state==="out"?"突破の可能性なし":ms.every(m=>m.done)?"代表戦の結果次第":a.need!=null?`勝ち点あと${a.need}で突破確定`:a.mine?"全勝しても他の試合次第":"他の試合次第"}（現在 勝ち点${a.current}、残り${a.mine}試合）`);
     a.rows.forEach(r=>lines.push(`  勝ち点あと${r.g}（${recordsFor(r.g,a.mine)}）：残り試合の全パターンのうち 確定${r.sure}・同点の順位次第${r.chance}・敗退${r.no}`));
     const sc=finalScenarios(tm,ms,f,n,S.rule);
     if(sc){lines.push(`最終戦（対 ${sc.opp}）の条件：`);sc.out.forEach(o=>{lines.push(`  ${o.lab}：${o.head}`);o.lines.forEach(l=>lines.push(`    ${l}`))})}
