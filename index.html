@@ -142,7 +142,7 @@ button:disabled{opacity:.5;cursor:default}
     <p class="note">男女・全グループ・決勝トーナメントの入力をまとめて出します。1行＝1つの得点（得点のない本は1行）。時刻はこの携帯の時計で、得点ボタンを押した時刻です（この更新より前に入れた点は空欄）。Excel で開けます。</p>
     <button id="resetBtn" class="small">このグループの結果を消す</button>
     <p class="note" id="setmsg"></p>
-    <p class="note">勝ち3・引分1・負け0。準々決勝へは各組上位2チーム。同点の順は 直接対決 → 勝った試合数（個人戦）→ 総得点 → 総失点 → 一本 → 被一本 → 技あり → 被技あり → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは、上のチームが抜けるたびに残りを直接対決から比べ直します。</p>
+    <p class="note">勝ち3・引分1・負け0。準々決勝へは各組上位2チーム。同点の順は 直接対決 → 勝った試合数（個人戦）→ 総得点 → 総失点 → 一本 → 被一本 → 技あり → 被技あり → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは直接対決を使わず勝数から比べ、2チームに絞れたらその2チームは直接対決から比べ直します。</p>
   </div></details>
   <section class="panel" id="aiPanel" hidden>
     <h2 id="aiTitle">AIに質問（いま表示している画面の入力内容をもとに答えます）</h2>
@@ -227,13 +227,14 @@ function standings(teams,ms,n,rule){
   // 代表戦（グループ戦）：その2チームの試合に勝者を入れておく
   const po={};
   ms.forEach(m=>{if(m.rep==="a"||m.rep==="b"){const w=m.rep==="a"?m.x:m.y,l=m.rep==="a"?m.y:m.x;po[w+"-"+l]=1;po[l+"-"+w]=-1}});
-  // 同点の決め方（4.2.3）：直接対決 → 勝数 → … → 代表戦。上の組が抜けたら、残りは1番から比べ直す（「2チームずつ、毎回1番から」に合わせる）
+  // 同点の決め方（4.2.3）：直接対決 → 勝数 → … → 代表戦。3チーム以上の同点は直接対決を飛ばして勝数から。上の組が抜けたら、残りは1番から比べ直す
   const allDone=ms.every(m=>m.done);
   const split=(G,key,dir)=>{const vals=[...new Set(G.map(key))].sort((u,v)=>dir*(v-u));return vals.map(v=>G.filter(t=>key(t)===v))};
   function resolve(G,why){
     if(G.length===1){G[0].why=why;return G}
     const hs=t=>G.reduce((v,o)=>v+(o.i!==t.i?(h2h[t.i+"-"+o.i]||0):0),0);
-    let P=split(G,hs,1),c="直接対決";
+    // 3チーム以上が並んだら直接対決は使わず勝数から（ダイスケ 11/17）。2チームに絞れたら直接対決から比べ直す
+    let P=G.length>=3?[G]:split(G,hs,1),c="直接対決";
     if(P.length===1){c=null;
       for(const[k,sgn,lb]of CR){const Q=split(G,t=>t[k],sgn);if(Q.length>1){P=Q;c=lb;break}}}
     // まだ試合が残っているときは代表戦にしない（並びは仮のまま、印も付けない）
@@ -292,8 +293,8 @@ function h2hOf(ms,a,b,n,rule){
   if(!m)return 0;const r=matchResult(m,n,rule);if(r==="d")return 0;
   return ((r==="a")===(m.x===a))?1:-1;
 }
-function rivalNow(me,r,ms,n,rule){
-  const h=h2hOf(ms,me.i,r.i,n,rule);
+function rivalNow(me,r,ms,n,rule,multi){
+  const h=multi?0:h2hOf(ms,me.i,r.i,n,rule);   // 3チーム以上で並んでいるときは直接対決を使わない
   return rivalBase(me,r,h)+`／一本 ${me.if}対${r.if}`;
 }
 function rivalBase(me,r,h){
@@ -337,10 +338,12 @@ function finalScenarios(tm,ms,f,n,rule){
     else if(ahead.length+tied.length<=1)head="突破";
     else{
       const beat=tied.length-(1-ahead.length);
-      head=beat===tied.length?"同点の全チームを上回れば突破":`同点の${tied.length}チームのうち${beat}チームを上回れば突破`;
+      head=(beat===tied.length?"同点の全チームを上回れば突破":`同点の${tied.length}チームのうち${beat}チームを上回れば突破`)+(tied.length>=2?"（3チーム以上で並ぶので直接対決は使わず、個人戦の勝数→総得点）":"");
       lines=tied.map(r=>{
         let t;
-        if(r.i===opp){
+        if(tied.length>=2){   // 3チーム以上で並ぶ：直接対決は使わず、個人戦の勝数→総得点
+          t=r.i===opp?`この試合の個人戦の勝数・得点しだい（いま勝数 ${me.bw}対${r.bw}・総得点 ${me.pf}対${r.pf}）`:needInMatch(me,r,n);
+        }else if(r.i===opp){
           if(idx===0)t="直接対決に勝つので上";
           else if(idx===2)t="直接対決に負けるので下";
           else{const k=r.bw-me.bw,p=r.pf-me.pf;t=k<0?"個人戦の勝数で上":k>0?"個人戦の勝数で下":p<0?"総得点で上":p>0?"総得点で下":"総得点も同じ。"+afterPoints(me,r)}
@@ -372,6 +375,7 @@ function restScenarios(tm,ms,f,n,rule,labOf){
     const spots=2-ahead.length;
     if(spots<=0)return"out";
     if(grp.length<spots)return"in";
+    if(grp.length>=2)return"tie:"+grp.map(i=>tm[i]).join("・");   // 3チーム以上の同点：直接対決は使わない
     const G=[f,...grp],hs=i=>G.reduce((v,j)=>v+(i===j?0:(H[key(i,j)]||0)),0),mh=hs(f);
     const k1=grp.filter(i=>hs(i)>mh).length,k2=grp.filter(i=>hs(i)===mh);
     if(k1>=spots)return"out";
@@ -695,7 +699,7 @@ function boot(){
       else if(h<0)out.push(`${r.name}と2チームで並ぶと直接対決で下${note}`);
       else out.push(`${r.name}と並んだら：${need(r)}${note}`);
     });
-    if(cand.length>=2)out.push(`3チーム以上で並んで直接対決が勝ち負け同数なら、個人戦の勝数→総得点：`+cand.map(({r})=>`${r.name}に${need(r)}`).join("／"));
+    if(cand.length>=2)out.push(`3チーム以上で並んだら直接対決は使わず、個人戦の勝数→総得点：`+cand.map(({r})=>`${r.name}に${need(r)}`).join("／"));
     return out;
   }
   // 同じ組で同時に入力中の試合（他コート）を「今のまま終われば」で計算に入れた条件
@@ -744,7 +748,7 @@ function boot(){
     const st=standings(tm,ms,n,S.rule),me=st.find(s=>s.i===f);
     const rv=st.filter(s=>s.i!==f&&s.vp===me.vp&&(s.gp>0||me.gp>0));
     if(!rv.length)return rsH;
-    return rsH+`<h2>勝ち点が同じ相手との差</h2><div class="rows">`+rv.map(r=>`<div class="row" style="display:block"><b>${r.name}</b><p class="note">${rivalNow(me,r,ms,n,S.rule)}</p></div>`).join("")+`</div>`;
+    return rsH+`<h2>勝ち点が同じ相手との差</h2>${rv.length>=2?`<p class="note">3チーム以上で並んでいるので、直接対決は使わず個人戦の勝数から比べます。</p>`:""}<div class="rows">`+rv.map(r=>`<div class="row" style="display:block"><b>${r.name}</b><p class="note">${rivalNow(me,r,ms,n,S.rule,rv.length>=2)}</p></div>`).join("")+`</div>`;
   }
   /* 入力中の本の真上に出す状況：勝数・得点差と、勝つ／突破するのに必要なこと */
   const CUR={},UNDO={};
@@ -929,7 +933,7 @@ function boot(){
   const RULES=`あなたは2026 Karate World Cup（杭州）団体組手のグループ戦を見ている日本チームのアナリストの補助です。
 ルール：各組5チームの総当たり。上位2チームが準々決勝。1試合は男子5本・女子3本で、グループ戦は勝敗が決まっても全部行う。
 試合の勝ち点は 勝ち3・引分1・負け0。個人戦の得点は 有効1・技あり2・一本3。失格・棄権は相手に8点、本人0点として数える。個人戦（1本）は得点の多いほうの勝ち、同点なら先取（最初に得点した選手。取り消しあり）のほうの勝ち、先取がなければ引分（一本・技ありの数では決めない）。
-同点の順位は 直接対決の勝者 → 個人戦の勝数 → 総得点 → 総失点（少ないほう） → 一本の数 → 被一本（少ないほう） → 技あり → 被技あり（少ないほう） → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは、上のチームが抜けるたびに残りのチームを直接対決から比べ直す。
+同点の順位は 直接対決の勝者 → 個人戦の勝数 → 総得点 → 総失点（少ないほう） → 一本の数 → 被一本（少ないほう） → 技あり → 被技あり（少ないほう） → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは直接対決を使わず個人戦の勝数から比べ、2チームに絞れたらその2チームは直接対決から比べ直す。
 決勝トーナメント（準々決勝・準決勝・3位決定戦・決勝）は、どちらかが個人戦の過半数に勝った時点で試合終了。全部戦って勝数が同じなら総得点の多いほう、それも同じなら代表戦。
 答え方：日本語で、結論を最初に1〜2文。そのあと根拠を短い箇条書きで。数字は下の「現在のデータ」と「ページの計算結果」だけを使い、推測で結果を作らない。分からないこと（未入力の試合の結果など）は分からないと言う。スマホで読むので短く。`;
   const sideTxt=s=>`有効${s.y}・技あり${s.w}・一本${s.i}`;
