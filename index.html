@@ -85,6 +85,7 @@ td .pill{margin-left:4px}
 .now{border:2px solid var(--fg);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:13px}
 .now .sb{font-size:17px;font-weight:800}
 .now .lv{font-weight:700}
+.now .lt{display:flex;gap:4px;flex-wrap:wrap;margin:2px 0}.now .lt button{min-height:30px;padding:2px 8px;font-size:12px}.now .lt button[aria-pressed="true"]{background:var(--fg);color:var(--card)}
 input.pn{font:inherit;font-size:16px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:inherit;width:100%;min-width:0;box-sizing:border-box}
 button.bh{border:0;background:none;min-height:32px;padding:0;width:100%;text-align:left}
 .bh .hint{font-weight:400;color:var(--muted);font-size:11px}
@@ -122,10 +123,9 @@ button:disabled{opacity:.5;cursor:default}
   <details class="panel"><summary>設定と控え</summary><div>
     <label for="tieRule"><b>同じ勝数のときの試合結果</b></label>
     <select id="tieRule">
-      <option value="bouts">勝数が同じなら引分（大会側に確認済み）</option>
       <option value="points">総得点の多いほうの勝ち。得点も同じなら引分</option>
     </select>
-    <p class="note">グループ戦では団体として勝負を決めない（勝数が同じなら引分）と確認済み（11/12）。総得点は順位を決めるときに使います。</p>
+    <p class="note">団体戦の勝敗：勝った人数 → 総得点 → 引分（ルールはこれだけ）。</p>
     <label><b>この組のチーム名（対戦相手の変更）</b></label>
     <div id="tnBox" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
     <div class="actions"><button id="tnSave" class="small">チーム名を保存</button><button id="tnReset" class="small">大会の組分けに戻す</button></div>
@@ -171,11 +171,31 @@ const CATS={
     D:["日本","メキシコ","ドイツ","アルジェリア","アゼルバイジャン"]}}
 };
 /* ---------- 計算（画面に依存しない純粋関数） ---------- */
-/* 試合順と赤・青（過去の大会からの推定、ほぼ確定）。書いていない組は機械的な並び */
+/* 試合順と赤・青。WKF 公式タイムテーブル（男子 11/20、女子 11/21、中国時間。All days.pdf 11/19 19:45 版） */
 const ORDER={
-  M_A:[[0,1],[3,4],[0,2],[3,1],[0,3],[4,2],[0,4],[1,2],[1,4],[2,3]],
-  F_D:[[0,1],[3,4],[0,2],[3,1],[0,3],[4,2],[0,4],[1,2],[1,4],[2,3]]
+  M_A:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  M_B:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  M_C:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  M_D:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  F_A:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  F_B:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  F_C:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]],
+  F_D:[[0,1],[2,3],[0,4],[3,1],[4,2],[0,3],[1,2],[3,4],[0,2],[1,4]]
 };
+/* 公式タイムテーブルの時刻とコート（ORDER と同じ並び） */
+const SCHED={
+  M_A:["10:35・コート1","10:35・コート2","11:20・コート1","11:20・コート2","12:10・コート1","12:10・コート2","13:00・コート1","13:00・コート2","13:50・コート1","13:50・コート2"],
+  M_B:["10:35・コート3","10:35・コート4","11:20・コート3","11:20・コート4","12:10・コート3","12:10・コート4","13:00・コート3","13:00・コート4","13:50・コート3","13:50・コート4"],
+  M_C:["14:40・コート1","14:40・コート2","15:30・コート1","15:30・コート2","16:20・コート1","16:20・コート2","17:10・コート1","17:10・コート2","18:00・コート1","18:00・コート2"],
+  M_D:["14:40・コート3","14:40・コート4","15:30・コート3","15:30・コート4","16:20・コート3","16:20・コート4","17:10・コート3","17:10・コート4","18:00・コート3","18:00・コート4"],
+  F_A:["10:35・コート1","10:35・コート2","11:00・コート1","11:00・コート2","11:30・コート1","11:30・コート2","12:00・コート1","12:00・コート2","12:30・コート1","12:30・コート2"],
+  F_B:["10:35・コート3","10:35・コート4","11:00・コート3","11:00・コート4","11:30・コート3","11:30・コート4","12:00・コート3","12:00・コート4","12:30・コート3","12:30・コート4"],
+  F_C:["13:00・コート1","13:00・コート2","13:30・コート1","13:30・コート2","14:00・コート1","14:00・コート2","14:30・コート1","14:30・コート2","15:00・コート1","15:00・コート2"],
+  F_D:["13:00・コート3","13:00・コート4","13:30・コート3","13:30・コート4","14:00・コート3","14:00・コート4","14:30・コート3","14:30・コート4","15:00・コート3","15:00・コート4"],
+};
+const OFFICIAL=k=>!!SCHED[k];
+const KOT={M_QF1:"11/20 19:10・コート1",M_QF2:"11/20 19:10・コート2",M_QF3:"11/20 19:10・コート3",M_QF4:"11/20 19:10・コート4",M_SF1:"11/21 16:40・コート2",M_SF2:"11/21 16:40・コート3",M_BR:"11/22 15:45か16:45・コート1",M_FN:"11/22 15:45か16:45・コート1",
+  F_QF1:"11/21 15:40・コート1",F_QF2:"11/21 15:40・コート2",F_QF3:"11/21 15:40・コート3",F_QF4:"11/21 15:40・コート4",F_SF1:"11/21 17:40・コート2",F_SF2:"11/21 17:40・コート3",F_BR:"11/22 11:45か12:15・コート1",F_FN:"11/22 11:45か12:15・コート1"};
 const emptySide=()=>({y:0,w:0,i:0});
 const emptyBout=()=>({a:emptySide(),b:emptySide(),o:null,dq:null});
 function pts(s){return s.y+2*s.w+3*s.i}
@@ -469,7 +489,7 @@ function liveNeed(m,n,me,rule,ko){
   if(W>=maj)return{done:ko?"勝ち":"勝ちが確定（このまま終われば）"};if(L>=maj)return{done:ko?"負け":"負けが確定（このまま終われば）"};
   let w=null;for(let x=0;x<=left;x++)if(W+x>L+(left-x)){w=x;break}
   let eq=null;for(let x=0;x<=left;x++)if(W+x===L+(left-x)){eq=x;break}
-  return{bout:false,left,w,eq,d:me==="a"?sAll.pa-sAll.pb:sAll.pb-sAll.pa};
+  return{bout:false,left,w,eq,W,L,D:sAll.played-W-L,d:me==="a"?sAll.pa-sAll.pb:sAll.pb-sAll.pa};
 }
 /* 決勝トーナメント（WKF Qualification and Competition System 5.2 の図） */
 const KO=[["QF1","準々決勝1",["D",2],["A",1]],["QF2","準々決勝2",["C",2],["B",1]],["QF3","準々決勝3",["B",2],["C",1]],["QF4","準々決勝4",["A",2],["D",1]],
@@ -505,7 +525,7 @@ function boot(){
   const LS="wc-hangzhou-v1";
   let S={ms:{},rule:"bouts",cat:"M",grp:"A",focus:{},open:null,mode:"g",names:{},orders:{},koNames:{}};
   try{const v=JSON.parse(localStorage.getItem(LS)||"null");if(v)S=Object.assign(S,v)}catch(e){}
-  if(!S.ruleFix1112){S.rule="bouts";S.ruleFix1112=1}
+  S.rule="points"; // 団体戦の勝敗は 勝った人数 → 総得点 → 引分 のみ（ダイスケ 11/19）
   let db=null,pending={},timers={};
   const $=id=>document.getElementById(id);
   const saveLocal=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
@@ -534,7 +554,9 @@ function boot(){
     const r={};["a","b"].forEach(s=>{const t=String(x[s]||"").trim().slice(0,20);if(t)r[s]=t});if(r.a||r.b)o[k]=r});return o};
   S.koNames=cleanKo(S.koNames);
   const allTeams=cat=>Object.keys(CATS[cat].groups).flatMap(g=>teamsOf(cat,g));
-  const getOrd=k=>S.orders[k]||ORDER[k];
+  // 公式の組：順番は公式どおり。赤青の入れ替えだけ反映（順番が公式と違う古い保存は使わない）
+  const sameSeq=(a,b)=>a&&b&&a.length===b.length&&a.every((p,i)=>Math.min(...p)===Math.min(...b[i])&&Math.max(...p)===Math.max(...b[i]));
+  const getOrd=k=>OFFICIAL(k)?(sameSeq(S.orders[k],ORDER[k])?S.orders[k]:ORDER[k]):(S.orders[k]||ORDER[k]);
   const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
   const teamsOf=(cat,g)=>{const o=S.names[cat+"_"+g],d=CATS[cat].groups[g];return o?o.map((x,i)=>x||d[i]):d};
   const teams=()=>teamsOf(S.cat,S.grp);
@@ -586,7 +608,7 @@ function boot(){
   function koHtml(r,n){
     const m=r.m,s=matchStat(m,n),A=tName(r.A),B=tName(r.B);
     const nm=t=>t.name?esc(t.name)+(t.man?'<small class="tent">手入力</small>':t.tent?'<small class="tent">暫定</small>':""):`<span class="tbd">${t.lab}</span>`;
-    const lab=r.win?(r.win==="a"?A:B)+" 勝ち":r.tie?"代表戦で決める":s.played?"入力中":"未入力";
+    const kt=KOT[S.cat+"_"+r.id],lab=(kt?kt+"・":"")+(r.win?(r.win==="a"?A:B)+" 勝ち":r.tie?"代表戦で決める":s.played?"入力中":"未入力");
     const head=`<button class="mh ${r.win?"done":""}" data-open="${m.id}" aria-expanded="${S.open===m.id}"><span class="a">${nm(r.A)}</span><span class="s">${s.wa} - ${s.wb}<small>${s.pa} - ${s.pb}点・${lab}</small></span><span class="b">${nm(r.B)}</span></button>`;
     if(S.open!==m.id)return head;
     const maj=Math.floor(n/2)+1,left=n-s.played,d=s.pa-s.pb;
@@ -653,7 +675,11 @@ function boot(){
     {const k=S.cat+"_"+S.grp,cur=getOrd(k)||PR,b="min-height:34px;padding:2px 8px";
      $("ordBox").innerHTML=cur.map(([r,bl],i)=>`<div style="display:flex;align-items:center;gap:4px"><span style="flex:1;min-width:0">${i+1}. <b style="color:#c62828">赤</b> ${esc(tm[r])} − <b style="color:#1565c0">青</b> ${esc(tm[bl])}</span><button class="small" style="${b}" data-ou="${i}" aria-label="${i+1}試合目を上へ" ${i?"":"disabled"}>↑</button><button class="small" style="${b}" data-od="${i}" aria-label="${i+1}試合目を下へ" ${i<cur.length-1?"":"disabled"}>↓</button><button class="small" style="${b}" data-os="${i}" aria-label="${i+1}試合目の赤青を入れ替え">⇄</button></div>`).join("");
      $("ordReset").textContent=ORDER[k]?"推定の試合順に戻す":"元の並びに戻す";
-     $("ordReset").disabled=!S.orders[k];}
+     $("ordReset").disabled=!S.orders[k];
+     if(OFFICIAL(k)){const sw=sameSeq(S.orders[k],ORDER[k]);
+       $("ordBox").innerHTML=cur.map(([r,bl],i)=>`<div style="display:flex;align-items:center;gap:4px"><span style="flex:1;min-width:0">${i+1}. ${SCHED[k][i]}　<b style="color:#c62828">赤</b> ${esc(tm[r])} − <b style="color:#1565c0">青</b> ${esc(tm[bl])}</span><button class="small" style="${b}" data-os="${i}" aria-label="${i+1}試合目の赤青を入れ替え">⇄</button></div>`).join("")+`<p class="note">順番は WKF 公式タイムテーブルどおりで固定。⇄で赤青だけ入れ替えられます（入力済みの得点も一緒に入れ替わります）。</p>`;
+       $("ordReset").hidden=false;$("ordReset").textContent="公式の赤青に戻す";$("ordReset").disabled=!sw;$("ordNote").hidden=true}
+     else{$("ordReset").hidden=false;$("ordNote").hidden=false}}
     renderChips();
   }
   // 突破に必要な結果（この試合が計算対象チームの残り試合のとき）
@@ -716,6 +742,9 @@ function boot(){
     if(q)lines.push(`<b>${T}：${q.txt}</b>`);
     if(q&&q.tie)tieLines(tm,ms,f,n,m).forEach(t=>lines.push(`・${t}`));
     if(q)otherLive(tm,ms,f,n,m).forEach(t=>lines.push(t));
+    const bs=m.bouts||[],tc=j=>!!(bs[j]&&bs[j].t);
+    let pre2=n>=3;for(let j=0;j<n-2;j++)if(!tc(j))pre2=false;
+    if(pre2&&!tc(n-1)&&!(bs[n-2]&&bs[n-2].dq)&&(CUR[m.id]==null||CUR[m.id]<=n-2)){ladder(m,n,me,ko,T).forEach(t=>lines.push(t));return lines.join("<br>")}
     if(L.done){lines.push(`${T} の${L.done}`);return lines.join("<br>")}
     if(L.bout){
       const word=["負け","引分","勝ち"],nowW=word[L.now];
@@ -729,10 +758,114 @@ function boot(){
       if(q&&q.lv===1&&L.now<1&&L.draw!=null)lines.push(`→ 突破には${nm}であと${L.draw}点`);
       return lines.join("<br>");
     }
-    const sd=L.d>0?`+${L.d}`:`${L.d}`;
-    if(L.w==null)lines.push(`${T}：残り${L.left}戦では勝ち越せない（総得点差 ${sd}）`);
-    else lines.push(`${T}：残り${L.left}戦で${L.w}勝すれば勝ち${L.eq!=null?`。${L.eq}勝なら総得点の勝負（いま ${sd}）`:""}`);
+    restLines(L,T,ko).forEach(t=>lines.push(t));
     return lines.join("<br>");
+  }
+  /* 残り2本（男子：副将・大将／女子：中堅・大将）：すべての結果を調べ、次の本への指示と、その結果ごとに大将に必要なことを出す */
+  function ladder(m,n,me,ko,T){
+    const op=me==="a"?"b":"a",s0=matchStat(m,n-2),W0=me==="a"?s0.wa:s0.wb,L0=me==="a"?s0.wb:s0.wa,d0=me==="a"?s0.pa-s0.pb:s0.pb-s0.pa;
+    const nm=cfg().names,A1=nm[n-2],A2=nm[n-1],maj=Math.floor(n/2)+1,usePts=ko||S.rule!=="bouts",DR=ko?"代表戦":"引分";
+    if(W0>=maj)return[`${T}：勝ちが確定（${A1}・${A2}の結果に関係なく）`];
+    if(L0>=maj)return[`${T}：負けが確定`];
+    // 1本の結果を「点差（＋先取）」で並べる。M点差まで（8点差で試合終了なので現実の範囲）
+    const M=8,R=[];for(let d=-M;d<=M;d++){if(d===0)R.push({d:0,w:-1},{d:0,w:0},{d:0,w:1});else R.push({d,w:d>0?1:-1})}
+    const top=R.length-1;
+    const team=(a,b)=>{const W=W0+(a.w>0)+(b.w>0),L=L0+(a.w<0)+(b.w<0);
+      if(W>L)return 2;if(W<L)return 0;if(!usePts)return 1;const t=d0+a.d+b.d;return t>0?2:t<0?0:1};
+    const need=i=>{let w=null,dr=null;for(let j=0;j<=top;j++){const r=team(R[i],R[j]);if(r===2&&w==null)w=j;if(r>=1&&dr==null)dr=j}return{w,dr}};
+    const one=r=>{const x=R[r];return x.d<0?`${-x.d}点差の負け`:x.d>0?`${x.d}点差の勝ち`:x.w<0?"同点の先取負け":x.w>0?"同点の先取勝ち":"引分"};
+    const rng=(a,b)=>{const x=R[a],y=R[b];if(a===b)return one(a);
+      if(a===0&&b===top)return"どんな結果";
+      if(a===0&&y.d===0&&y.w<0)return"負け";
+      if(a===0&&y.d===0&&y.w===0)return"引分か負け";
+      if(a===0&&y.d<0)return`${-y.d}点差以上の負け`;
+      if(b===top&&x.d===0&&x.w>0)return"勝ち";
+      if(b===top&&x.d===0&&x.w===0)return"勝つか引分";
+      if(b===top&&x.d>0)return`${x.d}点差以上の勝ち`;
+      if(x.d>0&&y.d>0)return`${x.d}〜${y.d}点差の勝ち`;
+      if(x.d<0&&y.d<0)return`${-y.d}〜${-x.d}点差の負け`;
+      if(x.d<0&&y.d===0&&y.w<0)return`${-x.d}点差までの負け`;
+      if(x.d===0&&x.w>0&&y.d>0)return`${y.d}点差までの勝ち`;
+      return one(a)+"〜"+one(b)};
+    const needTxt=({w,dr})=>{
+      if(w===0)return`${A2}の結果に関係なく勝ち`;
+      if(w==null)return dr==null?`${A2}で何をしても負け`:`${A2}で${rng(dr,top)}ならチームは${DR}（勝ちはない）`;
+      const x=R[w];let t=x.d<0?`${A2}は${-x.d}点差の負けまでOK`:x.d>0?`${A2}は${x.d}点差以上で勝つ`:x.w<0?`${A2}は同点の先取負けまでOK`:x.w>0?`${A2}は勝てばOK`:`${A2}は引分以上でOK`;
+      if(usePts&&dr!=null&&dr<w)t+=`（${rng(dr,w-1)}ならチームは${DR}）`;
+      return t};
+    const grp=[];for(let i=top;i>=0;i--){const v=need(i),k=JSON.stringify(v),g=grp[grp.length-1];if(g&&g.k===k)g.lo=i;else grp.push({k,hi:i,lo:i,n:v})}
+    const D=s0.played-W0-L0,out=[`${T}：残り2戦（いま${W0}勝${L0}敗${D?D+"分":""}・総得点${d0===0?"同点":(d0>0?"+":"")+d0+"点"}）`];
+    // 簡単な一覧：残り2戦の勝ち・引分・負けの数ごと
+    {const X=1-d0,simp=[];
+     [[2,0,0],[1,1,0],[1,0,1],[0,2,0],[0,1,1],[0,0,2]].forEach(([x,y,z])=>{
+      const W=W0+x,L=L0+z,lab=(x?x+"勝":"")+(z?z+"敗":"")+(y?y+(x||z?"分":"分け"):"");let t;
+      if(W>L)t="勝ち";else if(W<L)t="負け";else if(!usePts)t=DR;
+      else if(x===0&&z===0)t=d0>0?"勝ち":d0===0?DR:"負け";
+      else if(z===0)t=X<=0?"勝ち":x===1?`${X}点差以上の勝ちが必要`:`2本の点差の合計${X}点以上が必要`;
+      else if(x===0)t=d0<=0?"負け":d0===1?"同点の先取負けなら勝ち（1点差の負けは"+DR+"）":`${d0-1}点差以内の負けなら勝ち`.replace("負けなら",z===2?"負け（2本の合計）なら":"負けなら");
+      else t=X>0?`勝つ本の点差が負ける本より${X}点以上大きければ勝ち`:`負ける本の点差が勝つ本より${d0-1}点以内なら勝ち`;
+      simp.push(`${lab}：${t}`)});
+     var simpH=simp.join("<br>");}
+    // 大将に必要なことの重さ（5 関係なく勝ち／4 負けてもよい／3 引分以上／2 勝てばよい／1 点差をつけて勝つ／0 勝てない）
+    const cat=v=>v.w==null?0:v.w===0?5:R[v.w].d<0||(R[v.w].d===0&&R[v.w].w<0)?4:R[v.w].d===0&&R[v.w].w===0?3:R[v.w].d===0?2:1;
+    // 大将に必要なことの重さが同じものを1段にまとめ、良い順に1行ずつ
+    const ins=[];const tiers=[];grp.forEach(g=>{const c=cat(g.n),t=tiers[tiers.length-1];if(t&&t.c===c)t.g.push(g);else tiers.push({c,g:[g]})});
+    if(!grp.some(g=>g.n.w!=null))ins.push(`<b>${A1}・${A2}で2本とも勝っても届かない</b>`);
+    tiers.forEach((t,k)=>{const f0=t.g[0],fl=t.g[t.g.length-1];
+      let lab,txt;
+      if(t.c===1){lab=rng(f0.lo,f0.hi);txt=needTxt(f0.n)+(t.g.length>1?`（${A1}の結果が悪いほど、${A2}にもっと点差が必要）`:"")}
+      else{lab=rng(fl.lo,f0.hi);txt=needTxt(fl.n)+(t.c===4&&t.g.length>1?`（${A1}の結果が良いほど楽）`:"")}
+      txt=txt.replace("）（","。");
+      if(t.c===0&&tiers.some(u=>u.c===1)&&R[f0.hi].d<=-2)return; // 大きく負けた先の「届かない」は点差の段の続きなので省く
+      if(k===0&&t.c>0)ins.push(`<b>${A1}は${lab}を狙う → ${txt}</b>`);
+      else ins.push(`・${A1}が${lab} → ${txt}`)});
+    const cb=(m.bouts||[])[n-2];
+    if(cb&&cb.t){const w=boutWinner(cb),x=pts(cb[me]),y=pts(cb[op]),df=Math.max(-M,Math.min(M,x-y));
+      const idx=R.findIndex(r=>r.d===df&&(df!==0||r.w===(w===me?1:w==="d"?0:-1)));
+      if(idx>=0)ins.unshift(`いま${A1} ${x}-${y} → このまま終われば：${needTxt(need(idx))}`);}
+    const insH=ins.join("<br>");
+    // すべての場合（${A1}の勝・分・負 × ${A2}の勝・分・負）
+    const X=1-d0,f=v=>v>0?"+"+v:v<0?"−"+(-v):"0";
+    const cell=(c1,c2)=>{const W=W0+(c1>0)+(c2>0),L=L0+(c1<0)+(c2<0);
+      if(W>L)return"勝ち";if(W<L)return"負け";if(!usePts)return DR;
+      const lo=(c1<0||c2<0)?-1e9:0,hi=(c1>0||c2>0)?1e9:0;
+      if(lo>=X)return"勝ち";if(hi<X-1)return"負け";if(lo===hi)return DR;
+      if(hi<X)return`負け（合計0なら${DR}）`;
+      return`合計${f(X)}以上で勝ち（${f(X-1)}は${DR}）`};
+    const lab={1:"勝ち",0:"引分","-1":"負け"};
+    const allH=[1,0,-1].map(c1=>`<b>${A1} ${lab[c1]}</b>：`+[1,0,-1].map(c2=>`${A2} ${lab[c2]}→${cell(c1,c2)}`).join("／")).join("<br>")+(usePts?`<br><small>合計＝${A1}と${A2}の点差の合計（${T}から見て）</small>`:"");
+    // 横一列の小さいボタン。押したものだけ下に開く（縦の幅を小さく）
+    const tabs=[["simp","結果ごと",simpH],["ins",`${A1}への指示`,insH],["all","すべての場合",allH]];
+    const cur=tabs.find(t=>t[0]===KEEP.tab);
+    out[out.length-1]+=`<span class="lt">`+tabs.map(([k,l])=>`<button class="small" data-lt="${k}" aria-pressed="${KEEP.tab===k}">${l}</button>`).join("")+`</span>`+(cur?`<span style="display:block;font-weight:400">${cur[2]}</span>`:"");
+    return out;
+  }
+  /* 残り何戦かあるとき：残りの勝敗の組み合わせごとに、勝ち／総得点で決まるなら何点差が要るか */
+  function restLines(L,T,ko){
+    const sd=L.d>0?`+${L.d}`:`${L.d}`,pts=ko||S.rule!=="bouts",DR=ko?"代表戦":"引分";
+    const W0=L.W,L0=L.L,n=L.left,d=L.d,win=[],ptl=[],lose=[];
+    if(n>2){ // 残り3戦以上は短く（点差の細かい条件は残り2戦から）
+      if(L.w==null)return[`${T}：残り${n}戦では勝ち越せない（総得点差 ${sd}）`];
+      return[`${T}：残り${n}戦で${L.w}勝すれば勝ち${L.eq!=null?`。${L.eq}勝なら${pts?`総得点の勝負（いま ${sd}）`:DR}`:""}`];
+    }
+    const lab=(x,z,y)=>[x?x+"勝":"",z?z+"敗":"",y?y+"分":""].join("")||"";
+    for(let x=n;x>=0;x--)for(let z=0;z<=n-x;z++){const y=n-x-z,nm=lab(x,z,y),fw=W0+x,fl=L0+z;
+      if(fw>fl){win.push(nm);continue}
+      if(fw<fl){lose.push(nm);continue}
+      if(!pts){ptl.push(`${nm} → ${DR}`);continue}
+      const need=1-d,W1=x>1?`勝つ${x}本の点差の合計`:"勝つ本の点差",L1=z>1?`負ける${z}本の点差の合計`:"負ける本の点差";
+      let t;
+      if(x===0&&z===0)t=d>0?"勝ち":d===0?DR:"負け";
+      else if(z===0)t=need<=0?"勝ち":`${W1}が${need}点以上で勝ち（${need-1===0?"同点の先取勝ちだけなら":need-1+"点なら"}${DR}）`;
+      else if(x===0)t=d<=0?(d===0?`負け（同点の先取負けだけなら${DR}）`:"負け"):d===1?`同点の先取負けだけなら勝ち（${L1}が1点なら${DR}）`:`${L1}が${d-1}点以内なら勝ち（${d}点なら${DR}）`;
+      else t=need>0?`（${W1}）−（${L1}）が${need}点以上で勝ち（${need-1}点なら${DR}）`
+                   :`（${L1}）−（${W1}）が${d-1}点以内なら勝ち（${d}点なら${DR}）`;
+      ptl.push(`${nm} → ${t}`);}
+    const out=[`${T}：残り${n}戦（いま${W0}勝${L0}敗${L.D?L.D+"分":""}・総得点${d===0?"同点":sd+"点"}）`];
+    if(win.length)out.push(`・${win.join("・")} → 勝ち`);
+    ptl.forEach(t=>out.push(`・${t}`));
+    if(lose.length)out.push(`・${win.length||ptl.length?"それ以外":"どうなっても"} → 負け`);
+    return out;
   }
   const labOf=(ms,tm)=>m=>(hasOrder()?`${ms.indexOf(m)+1}試合目の`:"")+tm[m.x]+"対"+tm[m.y];
   function scoreHtml(tm,ms,f,n){
@@ -749,14 +882,15 @@ function boot(){
     return rsH+`<h2>勝ち点が同じ相手との差</h2>${cyc?`<p class="note">${G.length}チームの直接対決が一周しているので、個人戦の勝数から比べます。</p>`:""}<div class="rows">`+rv.map(r=>`<div class="row" style="display:block"><b>${r.name}</b><p class="note">${rivalNow(me,r,ms,n,S.rule,cyc)}</p></div>`).join("")+`</div>`;
   }
   /* 入力中の本の真上に出す状況：勝数・得点差と、勝つ／突破するのに必要なこと */
-  const CUR={},UNDO={};
+  const CUR={},UNDO={},KEEP={};
+  document.addEventListener("toggle",e=>{const d=e.target;if(d&&d.dataset&&d.dataset.keep)KEEP[d.dataset.keep]=d.open},true);
   // 試合のリセットと取り消し（練習用）。消す前の中身を覚えておく
   const resetHtml=id=>`<div class="actions"><button class="small" data-reset="${id}">この試合をリセット</button>${UNDO[id]!==undefined?`<button class="small" data-unreset="${id}">リセットを取り消す</button>`:""}</div>`;
   function curBout(m,n){
     const bs=m.bouts||[],t=j=>!!(bs[j]&&bs[j].t);
     // 大将の前まで全部入ったら大将の上（条件は大将の話になるため）
     let pre=true;for(let j=0;j<n-1;j++)if(!t(j))pre=false;
-    if(pre&&(CUR[m.id]==null||CUR[m.id]<n-1))return n-1;
+    if(pre&&(CUR[m.id]==null||CUR[m.id]<n-2))return n-1;
     if(CUR[m.id]!=null)return CUR[m.id];
     let k=0;bs.forEach((b,j)=>{if(b&&b.t&&j<n)k=j});return k;
   }
@@ -771,7 +905,7 @@ function boot(){
   function matchHtml(m,i,tm,n){
     const s=matchStat(m,n),r=m.done?matchResult(m,n,S.rule):null,A=tm[m.x],B=tm[m.y];
     const sc=m.q?(m.q==="a"?"勝 - 負":m.q==="b"?"負 - 勝":"引分"):`${s.wa} - ${s.wb}<small>${s.pa} - ${s.pb}点</small>`;
-    const lab=(hasOrder()?`${i+1}試合目・`:"")+(m.done?(r==="d"?"引分":(r==="a"?A:B)+" 勝ち"):(s.played?"入力中":"未入力"));
+    const sk=SCHED[S.cat+"_"+S.grp],lab=(hasOrder()?`${i+1}試合目${sk?"（"+sk[i]+"）":""}・`:"")+(m.done?(r==="d"?"引分":(r==="a"?A:B)+" 勝ち"):(s.played?"入力中":"未入力"));
     const head=`<button class="mh ${m.done?"done":""}" data-open="${m.id}" aria-expanded="${S.open===m.id}"><span class="a">${A}</span><span class="s">${sc}<small>${lab}</small></span><span class="b">${B}</span></button>`;
     if(S.open!==m.id)return head;
     const maj=Math.floor(n/2)+1,left=n-s.played;
@@ -810,6 +944,7 @@ function boot(){
     const M=s=>{const p=s.split(":");return[findMatch(p[0]),...p.slice(1)]};
     const bx=b.closest("[data-bk]"),key=bx?bx.dataset.bk:null,top0=bx?bx.getBoundingClientRect().top:0;
     const keep=()=>{if(!key)return;const e=document.querySelector(`[data-bk="${key}"]`);if(e)window.scrollBy(0,e.getBoundingClientRect().top-top0)};
+    if(d.lt){KEEP.tab=KEEP.tab===d.lt?null:d.lt;render();keep();return}
     const k0=d.pt||d.o||d.dq||d.undo||d.cur;
     if(k0){const p=k0.split(":");CUR[p[0]]=+p[1]}
     if(d.cur){render();keep();return}
@@ -858,7 +993,7 @@ function boot(){
     try{await navigator.clipboard.writeText(t);$("setmsg").textContent="コピーしました。"}catch(e){$("backup").select();$("setmsg").textContent="欄の文字を選択しました。手でコピーしてください。"}});
   $("bkLoad").addEventListener("click",()=>{try{const v=JSON.parse($("backup").value);if(!v||typeof v.ms!=="object")throw 0;
       const clean={};Object.keys(v.ms).forEach(k=>{if(IDRE.test(k))clean[k]=sanitize(v.ms[k])});
-      S.ms=clean;if(v.rule==="bouts"||v.rule==="points")S.rule=v.rule;if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders){S.orders=cleanOrders(v.orders);pushOrders()}if(v.koNames){S.koNames=cleanKo(v.koNames);pushKo()}Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
+      S.ms=clean;S.rule="points";if(v.names){S.names=cleanNames(v.names);pushNames()}if(v.orders){S.orders=cleanOrders(v.orders);pushOrders()}if(v.koNames){S.koNames=cleanKo(v.koNames);pushKo()}Object.keys(clean).forEach(pushMatch);saveLocal();render();$("setmsg").textContent="読み込みました。"}
     catch(e){$("setmsg").textContent="読み込めません。コピーした文字をそのまま貼り付けてください。"}});
   let armed=false;
   $("resetBtn").addEventListener("click",()=>{
@@ -1041,7 +1176,7 @@ function boot(){
     const js=t=>{try{return JSON.parse(t||"{}")}catch(e){return{}}};
     db.doc("settings/orders").onSnapshot(s=>{if(s.exists){S.orders=cleanOrders(js(s.data().json));saveLocal();render()}else if(Object.keys(S.orders).length)pushOrders()},()=>{});
     db.doc("settings/ko").onSnapshot(s=>{if(s.exists){S.koNames=cleanKo(js(s.data().json));saveLocal();render()}else if(Object.keys(S.koNames).length)pushKo()},()=>{});
-    db.doc("settings/main").onSnapshot(s=>{const r=s.exists&&s.data().rule;if(r==="bouts"||r==="points"){S.rule=r;saveLocal();render()}},()=>{});
+    db.doc("settings/main").onSnapshot(s=>{const r=s.exists&&s.data().rule;if(r==="bouts"){/* 古い設定は使わない */}},()=>{});
   })();
 }
 </script>
