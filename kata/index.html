@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ja"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="形の記入">
+<meta name="theme-color" content="#1f3c88">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>形の記入</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--ink:#1b1f2a;--sub:#5b6475;--line:#d9dde6;--acc:#1f3c88;--accs:#e7ecfa;--ok:#1b7a3a;--oks:#e3f4e8;--ng:#b3261e;--ngs:#fbe7e6;--md:#8a5a00;--mds:#fbf1dc}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12141a;--card:#1c1f27;--ink:#e8eaf0;--sub:#a3abbb;--line:#333846;--acc:#8fa8ff;--accs:#26304d;--ok:#6fd08f;--oks:#1d3326;--ng:#ff8a80;--ngs:#3a2120;--md:#f0c060;--mds:#3a2f17}}
+:root[data-theme="dark"]{--bg:#12141a;--card:#1c1f27;--ink:#e8eaf0;--sub:#a3abbb;--line:#333846;--acc:#8fa8ff;--accs:#26304d;--ok:#6fd08f;--oks:#1d3326;--ng:#ff8a80;--ngs:#3a2120;--md:#f0c060;--mds:#3a2f17}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;padding:0 0 40px}
+header{background:var(--acc);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+:root[data-theme="dark"] header{color:#12141a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) header{color:#12141a}}
+header h1{margin:0;font-size:18px}
+#net{font-size:12px;opacity:.9}
+main{max-width:640px;margin:0 auto;padding:0 16px}
+.tabs{display:flex;gap:6px;margin:12px 0}
+.tabs button,.seg button{flex:1;padding:9px 4px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;font-size:15px}
+.tabs button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:#fff}
+:root[data-theme="dark"] .tabs button[aria-pressed="true"],:root[data-theme="dark"] .seg button[aria-pressed="true"]{color:#12141a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabs button[aria-pressed="true"],:root:not([data-theme="light"]) .seg button[aria-pressed="true"]{color:#12141a}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0}
+h2{font-size:16px;margin:16px 0 6px}
+.note{color:var(--sub);font-size:13px;margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:center}
+td.t{text-align:left}
+tr.me td{background:var(--accs)}
+.big{font-size:18px;font-weight:700;margin:2px 0 6px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:13px;font-weight:600}
+.p-ok{background:var(--oks);color:var(--ok)}.p-ng{background:var(--ngs);color:var(--ng)}.p-md{background:var(--mds);color:var(--md)}
+.m{border:1px solid var(--line);border-radius:10px;padding:10px;margin:8px 0;background:var(--card)}
+.m.done{border-left:5px solid var(--acc)}
+.m .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:600}
+.row{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.row button{flex:1;min-width:0;padding:10px 6px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--ink);font-size:15px}
+.row button[aria-pressed="true"]{background:var(--acc);color:#fff;border-color:var(--acc)}
+:root[data-theme="dark"] .row button[aria-pressed="true"]{color:#12141a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .row button[aria-pressed="true"]{color:#12141a}}
+.votes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.votes button{padding:8px 2px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:14px}
+.votes button[aria-pressed="true"]{background:var(--acc);color:#fff;border-color:var(--acc)}
+:root[data-theme="dark"] .votes button[aria-pressed="true"]{color:#12141a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .votes button[aria-pressed="true"]{color:#12141a}}
+.sc{display:flex;gap:8px;margin-top:8px;align-items:center;font-size:14px;flex-wrap:wrap}
+.sc input{width:84px}
+input,select{font-size:16px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);max-width:100%}
+label{display:block;font-size:14px;margin:8px 0 2px}
+.cond div{padding:6px 0;border-bottom:1px dashed var(--line)}
+.cond div:last-child{border-bottom:0}
+.btn{padding:10px 14px;border:1px solid var(--acc);color:var(--acc);background:transparent;border-radius:9px;font-size:15px}
+.btn.danger{border-color:var(--ng);color:var(--ng)}
+textarea{width:100%;height:160px;font-size:13px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+details summary{cursor:pointer;color:var(--sub);font-size:14px}
+</style>
+</head><body>
+<header><h1>形の記入（団体形）</h1><div id="net"></div></header>
+<main>
+  <div class="tabs" id="cats"><button data-cat="M">男子</button><button data-cat="F">女子</button></div>
+  <div class="tabs" id="views"><button data-v="g">グループ</button><button data-v="k">決勝T</button><button data-v="s">設定</button></div>
+  <div id="app"></div>
+</main>
+<script>
+"use strict";
+const LS="wc-hangzhou-kata-v1";
+const PAIRS=[];for(let i=0;i<5;i++)for(let j=i+1;j<5;j++)PAIRS.push([i,j]);
+const KO=[["QF1","準々決勝1",["D",2],["A",1]],["QF2","準々決勝2",["C",2],["B",1]],["QF3","準々決勝3",["B",2],["C",1]],["QF4","準々決勝4",["A",2],["D",1]],
+  ["SF1","準決勝1","QF1","QF2"],["SF2","準決勝2","QF3","QF4"],["BR","3位決定戦","SF1","SF2"],["FN","決勝","SF1","SF2"]];
+const blank=()=>({grp:"A",teams:["日本","","","",""],focus:0,ms:{},extra:{},ko:{}});
+let S={cat:"M",view:"g",d:{M:blank(),F:blank()}};
+try{const v=JSON.parse(localStorage.getItem(LS)||"null");if(v&&v.d&&v.d.M&&v.d.F)S=Object.assign(S,v)}catch(e){}
+const save=()=>{try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}};
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const D=()=>S.d[S.cat];
+const nm=i=>D().teams[i]||`チーム${i+1}`;
+const key=(i,j)=>i<j?`${i}-${j}`:`${j}-${i}`;
+
+/* 1試合：w = 勝ったチームの番号、va = 小さい番号のチームを勝ちに選んだ審判の数（0〜7）、sa/sb = 5人の合計点（任意） */
+function stats(ms){
+  const st=[0,1,2,3,4].map(i=>({i,w:0,l:0,vp:0,v:0,vm:0,pl:0}));
+  PAIRS.forEach(([i,j])=>{const m=ms[key(i,j)];if(!m||m.w==null)return;
+    const wi=m.w,li=wi===i?j:i;st[wi].w++;st[wi].vp+=3;st[li].l++;st[i].pl++;st[j].pl++;
+    if(m.va==null){st[i].vm++;st[j].vm++}else{st[i].v+=m.va;st[j].v+=7-m.va}});
+  return st;
+}
+/* 勝ち点が並んだチームの順（大会規定 4.3.2）：直接対決 → 審判が勝ちに選んだ数の合計 → 追加の形。分かれたら、それぞれ直接対決から比べ直す */
+function resolve(G,ms,st,o){
+  if(G.length<=1)return[{t:G}];
+  const hw=t=>G.reduce((v,u)=>{if(u===t)return v;const m=ms[key(t,u)];return v+(m&&m.w===t?1:0)},0);
+  const split=f=>{const vals=[...new Set(G.map(f))].sort((a,b)=>b-a);return vals.length>1?vals.map(x=>G.filter(t=>f(t)===x)):null};
+  let p=split(hw);if(p)return p.flatMap(g=>resolve(g,ms,st,o));
+  if(o.votesUnknown(G))return[{t:G,why:o.mid?"途中":"票数"}];
+  p=split(t=>st[t].v);if(p)return p.flatMap(g=>resolve(g,ms,st,o));
+  if(G.length===2){const x=D().extra[key(G[0],G[1])];if(x!=null&&G.includes(x))return[{t:[x]},{t:[G.find(t=>t!==x)]}]}
+  return[{t:G,why:"追加の形"}];
+}
+function rankBlocks(ms,o){
+  const st=stats(ms),vps=[...new Set(st.map(s=>s.vp))].sort((a,b)=>b-a);
+  return{st,blocks:vps.flatMap(vp=>resolve(st.filter(s=>s.vp===vp).map(s=>s.i),ms,st,o).map(b=>Object.assign(b,{vp})))};
+}
+const left=(ms,t)=>PAIRS.some(p=>p.includes(t)&&!(ms[key(p[0],p[1])]&&ms[key(p[0],p[1])].w!=null));
+const live=ms=>({votesUnknown:G=>G.some(t=>left(ms,t)),mid:1});
+const posOf=(blocks,f)=>{let n=0;for(const b of blocks){if(b.t.includes(f))return{s:n,e:n+b.t.length,b};n+=b.t.length}};
+const cls=(blocks,f)=>{const p=posOf(blocks,f);return p.e<=2?"in":p.s>=2?"out":"md"};
+
+/* 残り試合の勝ち負けをすべて試す（票数は分からないものとして扱う） */
+function analyse(){
+  const d=D(),f=d.focus,rem=PAIRS.filter(([i,j])=>{const m=d.ms[key(i,j)];return!m||m.w==null});
+  const mine=rem.filter(p=>p.includes(f)),other=rem.filter(p=>!p.includes(f));
+  const res=[];
+  for(let a=0;a<1<<mine.length;a++){
+    const out={in:0,out:0,md:0};
+    for(let b=0;b<1<<other.length;b++){
+      const ms=JSON.parse(JSON.stringify(d.ms)),sim=new Set();
+      mine.forEach(([i,j],k)=>{const w=(a>>k&1)?f:(i===f?j:i);ms[key(i,j)]={w,va:null};sim.add(i);sim.add(j)});
+      other.forEach(([i,j],k)=>{ms[key(i,j)]={w:(b>>k&1)?i:j,va:null};sim.add(i);sim.add(j)});
+      const {blocks}=rankBlocks(ms,{votesUnknown:G=>G.some(t=>sim.has(t))});
+      out[cls(blocks,f)]++;
+    }
+    res.push({a,wins:mine.filter((p,k)=>a>>k&1).length,out,beat:mine.map((p,k)=>({opp:p[0]===f?p[1]:p[0],win:!!(a>>k&1)}))});
+  }
+  const all=res.reduce((s,r)=>({in:s.in+r.out.in,out:s.out+r.out.out,md:s.md+r.out.md}),{in:0,out:0,md:0});
+  return{res,all,mine,rem};
+}
+const verdict=o=>!o.out&&!o.md?["突破確定","p-ok"]:!o.in&&!o.md?["敗退","p-ng"]:!o.in&&!o.out?["票数・追加の形次第","p-md"]:!o.out?["突破確定か、票数次第","p-md"]:!o.in?["敗退か、票数次第","p-md"]:["ほかの試合次第","p-md"];
+
+function groupView(){
+  const d=D(),{st,blocks}=rankBlocks(d.ms,live(d.ms)),f=d.focus,an=analyse();
+  let rank=0,rows="";
+  blocks.forEach(b=>{b.t.forEach(t=>{const s=st[t];rows+=`<tr class="${t===f?"me":""}"><td>${b.t.length>1?`${rank+1}〜${rank+b.t.length}`:rank+1}</td><td class="t">${esc(nm(t))}</td><td>${s.vp}</td><td>${s.w}-${s.l}</td><td>${s.v}${s.vm?`<span class="note">（未記入${s.vm}）</span>`:""}</td></tr>`});rank+=b.t.length});
+  const ties=blocks.filter(b=>b.t.length>1&&b.why!=="途中");
+  const tieNote=ties.map(b=>`<p class="note">${b.t.map(nm).map(esc).join("・")}：${b.why==="票数"?"審判の票数で決まります":"票数も同じ。追加の形で決まります（設定で結果を入れられます）"}</p>`).join("");
+  const [vt,vc]=an.rem.length?verdict(an.all):(()=>{const c=cls(blocks,f);return c==="in"?["突破","p-ok"]:c==="out"?["敗退","p-ng"]:["票数・追加の形次第","p-md"]})();
+  let cond="";
+  if(an.mine.length){
+    const byW={};an.res.forEach(r=>{(byW[r.wins]=byW[r.wins]||[]).push(r)});
+    cond=Object.keys(byW).sort((a,b)=>b-a).map(w=>{const rs=byW[w],vs=rs.map(r=>verdict(r.out)[0]);
+      if(new Set(vs).size===1){const [t,c]=verdict(rs[0].out);return`<div>残り${an.mine.length}試合で<b>${w}勝</b> → <span class="pill ${c}">${t}</span></div>`}
+      return rs.map(r=>{const [t,c]=verdict(r.out);return`<div>${r.beat.map(x=>`${esc(nm(x.opp))}に${x.win?"勝ち":"負け"}`).join("・")} → <span class="pill ${c}">${t}</span></div>`}).join("")}).join("");
+  }
+  const order=[...PAIRS].sort((p,q)=>(q.includes(f)-p.includes(f)));
+  const cards=order.map(([i,j])=>{const k=key(i,j),m=d.ms[k]||{};
+    const vb=[7,6,5,4,3,2,1,0].map(x=>`<button data-va="${k}:${x}" aria-pressed="${m.va===x}">${x}-${7-x}</button>`).join("");
+    return`<div class="m ${m.w!=null?"done":""}"><div class="hd"><span>${esc(nm(i))} 対 ${esc(nm(j))}</span>${m.w!=null?`<span class="pill p-ok">${esc(nm(m.w))} 勝ち</span>`:`<span class="note">未入力</span>`}</div>
+      <div class="row"><button data-w="${k}:${i}" aria-pressed="${m.w===i}">${esc(nm(i))} 勝ち</button><button data-w="${k}:${j}" aria-pressed="${m.w===j}">${esc(nm(j))} 勝ち</button></div>
+      <p class="note" style="margin-top:8px">審判7人の票（${esc(nm(i))}-${esc(nm(j))}）</p><div class="votes">${vb}</div>
+      <div class="sc">点（5人の合計・任意）<input inputmode="decimal" data-s="${k}:sa" value="${esc(m.sa||"")}" placeholder="${esc(nm(i))}"><input inputmode="decimal" data-s="${k}:sb" value="${esc(m.sb||"")}" placeholder="${esc(nm(j))}"></div>
+      ${m.w!=null||m.va!=null?`<div class="row"><button data-clr="${k}">この試合を消す</button></div>`:""}</div>`}).join("");
+  return`<div class="card"><div class="note">${esc(nm(f))}（${esc(d.grp)}組）</div><div class="big"><span class="pill ${vc}" style="font-size:16px">${vt}</span></div>
+    ${cond?`<div class="cond">${cond}</div>`:""}
+    <p class="note">勝ち点は 勝ち3・負け0（引分なし）。各組上位2チームが準々決勝。並んだら 直接対決 → 審判が勝ちに選んだ数の合計 → 追加の形（大会規定 4.3.2）。まだの試合の票数は分からないものとして計算します。</p></div>
+  <h2>順位</h2><div class="card"><table><tr><th>順</th><th class="t" style="text-align:left">チーム</th><th>勝ち点</th><th>勝敗</th><th>票</th></tr>${rows}</table>${tieNote}</div>
+  <h2>試合</h2>${cards}`;
+}
+function koTeams(){
+  const d=D(),{blocks}=rankBlocks(d.ms,live(d.ms)),R={};
+  const done=PAIRS.every(([i,j])=>{const m=d.ms[key(i,j)];return m&&m.w!=null});
+  const slot=(g,p)=>{if(g!==d.grp)return"";const order=blocks.flatMap(b=>b.t.length>1?[]:b.t);const fixed=[];let n=0;for(const b of blocks){if(b.t.length>1)break;fixed.push(...b.t);n+=b.t.length}
+    return fixed[p-1]!=null&&done?nm(fixed[p-1]):""};
+  KO.forEach(([id,lab,x,y])=>{const r=d.ko[id]||{};let A,B,la,lb;
+    if(Array.isArray(x)){la=`${x[0]}組${x[1]}位`;lb=`${y[0]}組${y[1]}位`;A=r.a||slot(x[0],x[1]);B=r.b||slot(y[0],y[1])}
+    else{const lose=id==="BR",px=R[x],py=R[y];la=`${x}の${lose?"負け":"勝ち"}`;lb=`${y}の${lose?"負け":"勝ち"}`;
+      const pick=(p,l)=>p&&p.w?(l?(p.w==="a"?p.B:p.A):(p.w==="a"?p.A:p.B)):"";A=r.a||pick(px,lose);B=r.b||pick(py,lose)}
+    R[id]={id,lab,la,lb,A,B,w:r.w}});
+  return R;
+}
+function koView(){
+  const d=D(),R=koTeams(),names=[...new Set([...d.teams.filter(Boolean)])];
+  const sec=(t,ids)=>`<h2>${t}</h2>`+ids.map(id=>{const r=R[id],dl=`dl-${id}`;
+    return`<div class="m ${r.w?"done":""}"><div class="hd"><span>${r.lab}</span>${r.w?`<span class="pill p-ok">${esc(r.w==="a"?r.A:r.B)||"?"} 勝ち</span>`:""}</div>
+    <label>${esc(r.la)}（赤）</label><input list="tn" data-kn="${id}:a" value="${esc(d.ko[id]&&d.ko[id].a||"")}" placeholder="${esc(r.A||"チーム名")}">
+    <label>${esc(r.lb)}（青）</label><input list="tn" data-kn="${id}:b" value="${esc(d.ko[id]&&d.ko[id].b||"")}" placeholder="${esc(r.B||"チーム名")}">
+    <div class="row"><button data-kw="${id}:a" aria-pressed="${r.w==="a"}">${esc(r.A||"赤")} 勝ち</button><button data-kw="${id}:b" aria-pressed="${r.w==="b"}">${esc(r.B||"青")} 勝ち</button></div></div>`}).join("");
+  return`<datalist id="tn">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>
+  <p class="note">自分の組の1位・2位は、グループの試合が全部終わって順位が決まると自動で入ります（薄い字）。ほかはチーム名を入れてください。勝ったチームは次の試合に進みます。準々決勝の組み合わせは大会規定 5.2 の図より。メダルマッチ（3位決定戦・決勝）は分解あり。</p>`+
+    sec("準々決勝",["QF1","QF2","QF3","QF4"])+sec("準決勝",["SF1","SF2"])+sec("3位決定戦・決勝",["BR","FN"]);
+}
+function setView(){
+  const d=D(),{blocks}=rankBlocks(d.ms,live(d.ms));
+  const ext=blocks.filter(b=>b.t.length===2&&b.why==="追加の形").concat(Object.keys(d.extra).length?[]:[]);
+  const exH=ext.length?ext.map(b=>{const k=key(b.t[0],b.t[1]);return`<p class="note">${esc(nm(b.t[0]))} と ${esc(nm(b.t[1]))} の追加の形</p><div class="row">${b.t.map(t=>`<button data-ex="${k}:${t}" aria-pressed="${d.extra[k]===t}">${esc(nm(t))} 勝ち</button>`).join("")}</div>`}).join(""):`<p class="note">今は追加の形が必要な同点はありません。</p>`;
+  return`<div class="card"><label>組</label><div class="seg tabs">${["A","B","C","D"].map(g=>`<button data-grp="${g}" aria-pressed="${d.grp===g}">${g}組</button>`).join("")}</div>
+  <label>この組の5チーム</label>${d.teams.map((t,i)=>`<input data-tn="${i}" value="${esc(t)}" placeholder="チーム${i+1}" style="width:100%;margin:3px 0">`).join("")}
+  <label>見るチーム</label><select id="focus">${d.teams.map((t,i)=>`<option value="${i}"${i===d.focus?" selected":""}>${esc(nm(i))}</option>`).join("")}</select></div>
+  <h2>追加の形の結果</h2><div class="card">${exH}</div>
+  <h2>結果をコピー</h2><div class="card"><p class="note">LINE などに貼れる文にします。</p><button class="btn" id="cp">文を作ってコピー</button><textarea id="out" readonly style="display:none;margin-top:8px"></textarea></div>
+  <h2>消去</h2><div class="card"><p class="note">${S.cat==="M"?"男子":"女子"}の入力を全部消します。</p><button class="btn danger" id="rs">${S.reset?"もう一度押すと消します":"全部消す"}</button></div>`;
+}
+function summary(){
+  const d=D(),{st,blocks}=rankBlocks(d.ms,live(d.ms));let r=0;
+  const L=[`団体形 ${S.cat==="M"?"男子":"女子"} ${d.grp}組`,"順位（勝ち点・勝敗・票）"];
+  blocks.forEach(b=>b.t.forEach(t=>{const s=st[t];L.push(`${r+1}${b.t.length>1?"（同点）":""} ${nm(t)} ${s.vp}点 ${s.w}-${s.l} 票${s.v}`)})||(r+=b.t.length));
+  L.push("試合");PAIRS.forEach(([i,j])=>{const m=d.ms[key(i,j)];if(!m||m.w==null)return;L.push(`${nm(i)} 対 ${nm(j)}：${nm(m.w)} 勝ち${m.va!=null?`（票 ${m.va}-${7-m.va}）`:""}${m.sa||m.sb?` 点 ${m.sa||"-"}/${m.sb||"-"}`:""}`)});
+  return L.join("\n");
+}
+function render(){
+  document.querySelectorAll("#cats button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cat===S.cat));
+  document.querySelectorAll("#views button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===S.view));
+  document.getElementById("app").innerHTML=S.view==="g"?groupView():S.view==="k"?koView():setView();
+}
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;const d=D(),ds=t.dataset;
+  if(ds.cat){S.cat=ds.cat;S.reset=0}
+  else if(ds.v){S.view=ds.v;S.reset=0}
+  else if(ds.w){const[k,w]=ds.w.split(":");const m=d.ms[k]=d.ms[k]||{};m.w=m.w===+w?null:+w}
+  else if(ds.va){const[k,v]=ds.va.split(":");const m=d.ms[k]=d.ms[k]||{};m.va=m.va===+v?null:+v}
+  else if(ds.clr){delete d.ms[ds.clr]}
+  else if(ds.kw){const[id,s]=ds.kw.split(":");const r=d.ko[id]=d.ko[id]||{};r.w=r.w===s?"":s}
+  else if(ds.ex){const[k,w]=ds.ex.split(":");d.extra[k]=d.extra[k]===+w?undefined:+w}
+  else if(ds.grp){d.grp=ds.grp}
+  else if(t.id==="cp"){const o=document.getElementById("out");o.value=summary();o.style.display="block";o.select();
+    (navigator.clipboard?navigator.clipboard.writeText(o.value):Promise.reject()).then(()=>{t.textContent="コピーしました"},()=>{try{document.execCommand("copy");t.textContent="コピーしました"}catch(x){t.textContent="下の文を長押ししてコピー"}});return}
+  else if(t.id==="rs"){if(!S.reset){S.reset=1;render();return}S.d[S.cat]=blank();S.reset=0;S.view="g"}
+  else return;
+  save();render();
+});
+document.addEventListener("change",e=>{const t=e.target,d=D(),ds=t.dataset;
+  if(ds.s){const[k,f]=ds.s.split(":");const m=d.ms[k]=d.ms[k]||{};m[f]=t.value.trim();save();return}
+  if(ds.tn!=null){d.teams[+ds.tn]=t.value.trim();save();const o=document.querySelector(`#focus option[value="${ds.tn}"]`);if(o)o.textContent=nm(+ds.tn);return}   // 続けて打てるように作り直さない
+  if(ds.kn){const[id,s]=ds.kn.split(":");const r=d.ko[id]=d.ko[id]||{};r[s]=t.value.trim();save();return}   // 勝ちのボタンを押すと次の試合に反映
+  if(t.id==="focus"){d.focus=+t.value;save();render()}
+});
+render();
+/* ネットなしで使う準備 */
+(function(){const n=document.getElementById("net");
+  if(!("serviceWorker" in navigator)){n.textContent="この開き方ではネットなしの準備ができません（Safari・Chrome で開いてください）";return}
+  navigator.serviceWorker.register("sw.js").then(()=>navigator.serviceWorker.ready).then(()=>{n.textContent="ネットなしでも使えます（入力はこの携帯の中に保存）"}).catch(()=>{n.textContent="ネットなしの準備に失敗しました。ネットのある所でもう一度開いてください"});
+})();
+</script>
+</body></html>
