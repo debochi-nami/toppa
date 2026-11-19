@@ -204,7 +204,8 @@ function boutWinner(bt){
   const x=pts(bt.a),y=pts(bt.b);
   if(x>y)return"a"; if(y>x)return"b";
   if(bt.o==="a"||bt.o==="b")return bt.o;   // 同点なら先取（最初に得点した側。取り消し・手動指定あり）
-  return"d";   // 同点で先取なし → 引分（団体戦の個人戦。一本・技ありの数は使わない：ダイスケ 11/16。数はグループの勝ち点が並んだときだけ使う）
+  const iw=ipw(bt);if(iw)return iw;   // 同点で先取なし → 一本の多いほう → 技ありの多いほう（WKF 12.2.3）
+  return"d";   // それも同じなら引分（WKF 12.2.4・12.2.5。団体戦の1本は判定なし）
 }
 function ipw(bt){const a=bt.a||{},b=bt.b||{};
   if((a.i|0)!==(b.i|0))return(a.i|0)>(b.i|0)?"a":"b";
@@ -473,7 +474,7 @@ function liveNeed(m,n,me,rule,ko){
     const s0=matchStat(m,n-1),w0=me==="a"?s0.wa:s0.wb,l0=me==="a"?s0.wb:s0.wa,d0=(me==="a"?s0.pa-s0.pb:s0.pb-s0.pa);
     if(w0>=maj)return{done:ko?"勝ち":"勝ちが確定"};if(l0>=maj)return{done:ko?"負け":"負けが確定"};
     const px=last&&last.t?pts(last[me]):0,py=last&&last.t?pts(last[op]):0;
-    const tb=0;
+    const iw=last&&last.t?ipw(last):null,tb=iw===me?1:iw===op?-1:0;   // 同点・先取なしは一本→技ありの数（加える点は有効として計算）
     const res=(x,y,sen)=>{const bt=x>y?1:x<y?-1:sen===me?1:sen===op?-1:tb;
       const bw=w0+(bt>0),bl=l0+(bt<0);if(bw>bl)return 2;if(bw<bl)return 0;
       if(!ko&&rule==="bouts")return 1;const t=d0+x-y;return t>0?2:t<0?0:1};
@@ -773,7 +774,7 @@ function boot(){
     const team=(a,b)=>{const W=W0+(a.w>0)+(b.w>0),L=L0+(a.w<0)+(b.w<0);
       if(W>L)return 2;if(W<L)return 0;if(!usePts)return 1;const t=d0+a.d+b.d;return t>0?2:t<0?0:1};
     const need=i=>{let w=null,dr=null;for(let j=0;j<=top;j++){const r=team(R[i],R[j]);if(r===2&&w==null)w=j;if(r>=1&&dr==null)dr=j}return{w,dr}};
-    const one=r=>{const x=R[r];return x.d<0?`${-x.d}点差の負け`:x.d>0?`${x.d}点差の勝ち`:x.w<0?"同点の先取負け":x.w>0?"同点の先取勝ち":"引分"};
+    const one=r=>{const x=R[r];return x.d<0?`${-x.d}点差の負け`:x.d>0?`${x.d}点差の勝ち`:x.w<0?"同点での負け":x.w>0?"同点での勝ち":"引分"};
     const rng=(a,b)=>{const x=R[a],y=R[b];if(a===b)return one(a);
       if(a===0&&b===top)return"どんな結果";
       if(a===0&&y.d===0&&y.w<0)return"負け";
@@ -790,7 +791,7 @@ function boot(){
     const needTxt=({w,dr})=>{
       if(w===0)return`${A2}の結果に関係なく勝ち`;
       if(w==null)return dr==null?`${A2}で何をしても負け`:`${A2}で${rng(dr,top)}ならチームは${DR}（勝ちはない）`;
-      const x=R[w];let t=x.d<0?`${A2}は${-x.d}点差の負けまでOK`:x.d>0?`${A2}は${x.d}点差以上で勝つ`:x.w<0?`${A2}は同点の先取負けまでOK`:x.w>0?`${A2}は勝てばOK`:`${A2}は引分以上でOK`;
+      const x=R[w];let t=x.d<0?`${A2}は${-x.d}点差の負けまでOK`:x.d>0?`${A2}は${x.d}点差以上で勝つ`:x.w<0?`${A2}は同点での負けまでOK`:x.w>0?`${A2}は勝てばOK`:`${A2}は引分以上でOK`;
       if(usePts&&dr!=null&&dr<w)t+=`（${rng(dr,w-1)}ならチームは${DR}）`;
       return t};
     const grp=[];for(let i=top;i>=0;i--){const v=need(i),k=JSON.stringify(v),g=grp[grp.length-1];if(g&&g.k===k)g.lo=i;else grp.push({k,hi:i,lo:i,n:v})}
@@ -802,7 +803,7 @@ function boot(){
       if(W>L)t="勝ち";else if(W<L)t="負け";else if(!usePts)t=DR;
       else if(x===0&&z===0)t=d0>0?"勝ち":d0===0?DR:"負け";
       else if(z===0)t=X<=0?"勝ち":x===1?`${X}点差以上の勝ちが必要`:`2本の点差の合計${X}点以上が必要`;
-      else if(x===0)t=d0<=0?"負け":d0===1?"同点の先取負けなら勝ち（1点差の負けは"+DR+"）":`${d0-1}点差以内の負けなら勝ち`.replace("負けなら",z===2?"負け（2本の合計）なら":"負けなら");
+      else if(x===0)t=d0<=0?"負け":d0===1?"同点での負けなら勝ち（1点差の負けは"+DR+"）":`${d0-1}点差以内の負けなら勝ち`.replace("負けなら",z===2?"負け（2本の合計）なら":"負けなら");
       else t=X>0?`勝つ本の点差が負ける本より${X}点以上大きければ勝ち`:`負ける本の点差が勝つ本より${d0-1}点以内なら勝ち`;
       simp.push(`${lab}：${t}`)});
      var simpH=simp.join("<br>");}
@@ -835,7 +836,8 @@ function boot(){
     const lab={1:"勝ち",0:"引分","-1":"負け"};
     const allH=[1,0,-1].map(c1=>`<b>${A1} ${lab[c1]}</b>：`+[1,0,-1].map(c2=>`${A2} ${lab[c2]}→${cell(c1,c2)}`).join("／")).join("<br>")+(usePts?`<br><small>合計＝${A1}と${A2}の点差の合計（${T}から見て）</small>`:"");
     // 横一列の小さいボタン。押したものだけ下に開く（縦の幅を小さく）
-    const tabs=[["simp","結果ごと",simpH],["ins",`${A1}への指示`,insH],["all","すべての場合",allH]];
+    const NT=`<br><small>「同点での勝ち」＝同点で先取、先取がなければ一本→技ありの数で勝つこと</small>`;
+    const tabs=[["simp","結果ごと",simpH],["ins",`${A1}への指示`,insH+NT],["all","すべての場合",allH]];
     const cur=tabs.find(t=>t[0]===KEEP.tab);
     out[out.length-1]+=`<span class="lt">`+tabs.map(([k,l])=>`<button class="small" data-lt="${k}" aria-pressed="${KEEP.tab===k}">${l}</button>`).join("")+`</span>`+(cur?`<span style="display:block;font-weight:400">${cur[2]}</span>`:"");
     return out;
@@ -856,8 +858,8 @@ function boot(){
       const need=1-d,W1=x>1?`勝つ${x}本の点差の合計`:"勝つ本の点差",L1=z>1?`負ける${z}本の点差の合計`:"負ける本の点差";
       let t;
       if(x===0&&z===0)t=d>0?"勝ち":d===0?DR:"負け";
-      else if(z===0)t=need<=0?"勝ち":`${W1}が${need}点以上で勝ち（${need-1===0?"同点の先取勝ちだけなら":need-1+"点なら"}${DR}）`;
-      else if(x===0)t=d<=0?(d===0?`負け（同点の先取負けだけなら${DR}）`:"負け"):d===1?`同点の先取負けだけなら勝ち（${L1}が1点なら${DR}）`:`${L1}が${d-1}点以内なら勝ち（${d}点なら${DR}）`;
+      else if(z===0)t=need<=0?"勝ち":`${W1}が${need}点以上で勝ち（${need-1===0?"同点での勝ちだけなら":need-1+"点なら"}${DR}）`;
+      else if(x===0)t=d<=0?(d===0?`負け（同点での負けだけなら${DR}）`:"負け"):d===1?`同点での負けだけなら勝ち（${L1}が1点なら${DR}）`:`${L1}が${d-1}点以内なら勝ち（${d}点なら${DR}）`;
       else t=need>0?`（${W1}）−（${L1}）が${need}点以上で勝ち（${need-1}点なら${DR}）`
                    :`（${L1}）−（${W1}）が${d-1}点以内なら勝ち（${d}点なら${DR}）`;
       ptl.push(`${nm} → ${t}`);}
@@ -933,7 +935,7 @@ function boot(){
     return `<div class="bout" data-bk="${i}:${k}"><button class="bh" data-cur="${i}:${k}"><span>${nm}</span><span>${res}</span></button>
       <div class="sides">${side("a",A)}${side("b",B)}</div>
       <div class="tie">
-        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">${bt.o?"先取なしで終了（引分）":"引分で終了"}</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:bt.o?`<span class="sen">先取：${bt.o==="a"?A:B}</span><button data-o="${i}:${k}:${bt.o}">先取を取り消す</button>`:bt.h&&bt.h.length?`<span class="sen">先取なし</span><button data-o="${i}:${k}:a">${A} に先取</button><button data-o="${i}:${k}:b">${B} に先取</button>`:""}
+        ${tied?`<button data-o="${i}:${k}:d" aria-pressed="${!!bt.t&&!bt.o}">${ipw(bt)?"先取なしで終了（一本・技ありの数で決着）":bt.o?"先取なしで終了（引分）":"引分で終了"}</button><button data-o="${i}:${k}:a" aria-pressed="${bt.o==="a"}">${A} 先取</button><button data-o="${i}:${k}:b" aria-pressed="${bt.o==="b"}">${B} 先取</button>`:bt.o?`<span class="sen">先取：${bt.o==="a"?A:B}</span><button data-o="${i}:${k}:${bt.o}">先取を取り消す</button>`:bt.h&&bt.h.length?`<span class="sen">先取なし</span><button data-o="${i}:${k}:a">${A} に先取</button><button data-o="${i}:${k}:b">${B} に先取</button>`:""}
         <button data-undo="${i}:${k}">1つ戻す</button>
         <button data-dq="${i}:${k}:a" aria-pressed="${bt.dq==="a"}">${A} 失格・棄権</button><button data-dq="${i}:${k}:b" aria-pressed="${bt.dq==="b"}">${B} 失格・棄権</button>
       </div></div>`;
@@ -1065,7 +1067,7 @@ function boot(){
   /* ---------- AIに質問：表示中の組の入力と計算結果を文章にして渡す ---------- */
   const RULES=`あなたは2026 Karate World Cup（杭州）団体組手のグループ戦を見ている日本チームのアナリストの補助です。
 ルール：各組5チームの総当たり。上位2チームが準々決勝。1試合は男子5戦・女子3戦で、グループ戦は勝敗が決まっても全部行う。
-試合の勝ち点は 勝ち3・引分1・負け0。個人戦の得点は 有効1・技あり2・一本3。失格・棄権は相手に8点、本人0点として数える。個人戦（1本）は得点の多いほうの勝ち、同点なら先取（最初に得点した選手。取り消しあり）のほうの勝ち、先取がなければ引分（一本・技ありの数では決めない）。
+試合の勝ち点は 勝ち3・引分1・負け0。個人戦の得点は 有効1・技あり2・一本3。失格・棄権は相手に8点、本人0点として数える。個人戦（1本）は得点の多いほうの勝ち、同点なら先取（最初に得点した選手。取り消しあり）のほうの勝ち、先取がなければ一本の多いほう、次に技ありの多いほう、それも同じなら引分（WKF 12.2.3〜12.2.5）。
 同点の順位は 直接対決の勝者 → 個人戦の勝数 → 総得点 → 総失点（少ないほう） → 一本の数 → 被一本（少ないほう） → 技あり → 被技あり（少ないほう） → 代表戦（WKF Qualification and Competition System 4.2.3）。3チーム以上が同点のときは、上のチームが抜けるたびに残りのチームを直接対決から比べ直す。
 決勝トーナメント（準々決勝・準決勝・3位決定戦・決勝）は、どちらかが個人戦の過半数に勝った時点で試合終了。全部戦って勝数が同じなら総得点の多いほう、それも同じなら代表戦。
 答え方：日本語で、結論を最初に1〜2文。そのあと根拠を短い箇条書きで。数字は下の「現在のデータ」と「ページの計算結果」だけを使い、推測で結果を作らない。分からないこと（未入力の試合の結果など）は分からないと言う。スマホで読むので短く。`;
